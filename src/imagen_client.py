@@ -33,20 +33,24 @@ def generate_image(prompt: str, filename: str | None = None) -> str:
         "No text or watermarks in the image."
     )
 
-    logger.info("Generating image with Gemini Imagen 3...")
-    response = client.models.generate_images(
-        model="imagen-3.0-generate-002",
-        prompt=full_prompt,
-        config=types.GenerateImagesConfig(
-            number_of_images=1,
-            aspect_ratio="16:9",       # Ideal for social media
-            safety_filter_level="block_some",
-            person_generation="allow_adult",
+    logger.info("Generating image with Gemini 2.0 Flash image generation...")
+    response = client.models.generate_content(
+        model="gemini-2.0-flash-exp-image-generation",
+        contents=full_prompt,
+        config=types.GenerateContentConfig(
+            response_modalities=["IMAGE", "TEXT"],
         ),
     )
 
-    if not response.generated_images:
-        raise RuntimeError("Imagen returned no images")
+    # Extract image bytes from response parts
+    image_bytes = None
+    for part in response.candidates[0].content.parts:
+        if part.inline_data is not None:
+            image_bytes = part.inline_data.data
+            break
+
+    if not image_bytes:
+        raise RuntimeError("Gemini returned no image data")
 
     # Save image to downloads/
     os.makedirs(config.downloads_dir, exist_ok=True)
@@ -55,7 +59,6 @@ def generate_image(prompt: str, filename: str | None = None) -> str:
         filename = f"imagen_{ts}.png"
     path = os.path.join(config.downloads_dir, filename)
 
-    image_bytes = response.generated_images[0].image.image_bytes
     with open(path, "wb") as f:
         f.write(image_bytes)
 
