@@ -5,9 +5,9 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=ubuntu
-WorkingDirectory=/home/ubuntu/ai-content-marketing
-ExecStart=/home/ubuntu/ai-content-marketing/venv/bin/python main.py start
+User=root
+WorkingDirectory=/root/ai-content-marketing
+ExecStart=/root/ai-content-marketing/venv/bin/python main.py start
 Restart=on-failure
 RestartSec=60
 StandardOutput=journal
