@@ -42,7 +42,7 @@ def create_video(script: str) -> str:
     return video_id
 
 
-def wait_for_video(video_id: str, timeout: int = 300) -> str:
+def wait_for_video(video_id: str, timeout: int = 600) -> str:
     """Poll until video is complete. Returns download URL."""
     url = f"{BASE_URL}/v1/video_status.get"
     headers = {"X-Api-Key": config.heygen_api_key}
