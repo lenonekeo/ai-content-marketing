@@ -1,0 +1,31 @@
+# Credentials - NEVER commit these
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+env/
+
+# Downloads (temp video/image files)
+downloads/*.mp4
+downloads/*.png
+downloads/*.jpg
+
+# Logs (keep directory, ignore content)
+logs/*.jsonl
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
