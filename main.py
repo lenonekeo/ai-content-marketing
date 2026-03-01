@@ -35,12 +35,12 @@ def _cleanup(*paths: str | None):
             logger.info(f"Cleaned up: {p}")
 
 
-def run_job(text_only: bool = False, no_video: bool = False):
+def run_job(text_only: bool = False, no_video: bool = False, force_theme: str | None = None):
     logger.info("=" * 60)
     logger.info("Starting content marketing job")
 
     # 1. Select theme
-    theme, industry = get_theme_for_today()
+    theme, industry = get_theme_for_today(force_theme=force_theme)
     logger.info(f"Theme: {theme['name']} | Industry: {industry}")
 
     # 2. Generate post text
@@ -162,9 +162,9 @@ def cmd_status():
         print()
 
 
-def cmd_run(text_only: bool, no_video: bool):
+def cmd_run(text_only: bool, no_video: bool, force_theme: str | None = None):
     try:
-        run_job(text_only=text_only, no_video=no_video)
+        run_job(text_only=text_only, no_video=no_video, force_theme=force_theme)
     except Exception as e:
         logger.exception(f"Job failed with unexpected error: {e}")
         sys.exit(1)
@@ -185,6 +185,7 @@ if __name__ == "__main__":
     run_p = sub.add_parser("run", help="Run once immediately")
     run_p.add_argument("--text-only", action="store_true", help="Skip all media generation")
     run_p.add_argument("--no-video", action="store_true", help="Generate image but skip video")
+    run_p.add_argument("--theme", default=None, help="Force a specific theme: use_case, tips, success_story, trends, problem_solution, educational, service_highlight")
 
     sub.add_parser("start", help="Start scheduled posting")
     sub.add_parser("status", help="Show recent execution history")
@@ -192,7 +193,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.command == "run":
-        cmd_run(text_only=args.text_only, no_video=getattr(args, "no_video", False))
+        cmd_run(text_only=args.text_only, no_video=getattr(args, "no_video", False), force_theme=getattr(args, "theme", None))
     elif args.command == "start":
         cmd_start()
     elif args.command == "status":

@@ -175,9 +175,15 @@ INDUSTRIES = [
 ]
 
 
-def get_theme_for_today() -> tuple[dict, str]:
+def get_theme_for_today(force_theme: str | None = None) -> tuple[dict, str]:
     today = datetime.now()
     day_of_year = today.timetuple().tm_yday
-    theme = THEMES[day_of_year % len(THEMES)]
+    if force_theme:
+        theme = next((t for t in THEMES if t["type"] == force_theme), None)
+        if not theme:
+            valid = [t["type"] for t in THEMES]
+            raise ValueError(f"Unknown theme '{force_theme}'. Valid: {valid}")
+    else:
+        theme = THEMES[day_of_year % len(THEMES)]
     industry = INDUSTRIES[day_of_year % len(INDUSTRIES)]
     return theme, industry
