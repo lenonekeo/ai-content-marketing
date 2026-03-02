@@ -49,6 +49,11 @@ class Config:
     facebook_page_id: str = _optional("FACEBOOK_PAGE_ID")
     facebook_enabled: bool = bool(_optional("FACEBOOK_ACCESS_TOKEN"))
 
+    # Instagram
+    instagram_access_token: str = _optional("INSTAGRAM_ACCESS_TOKEN")
+    instagram_account_id: str = _optional("INSTAGRAM_ACCOUNT_ID")
+    instagram_enabled: bool = bool(_optional("INSTAGRAM_ACCESS_TOKEN"))
+
     # Business Info
     business_name: str = _optional("BUSINESS_NAME", "AI Automation Company")
     business_website: str = _optional("BUSINESS_WEBSITE", "https://yourwebsite.com")

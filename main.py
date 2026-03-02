@@ -22,7 +22,7 @@ from src.logger import setup_logging, log_execution, read_recent
 from src.themes import get_theme_for_today
 from src import content_generator, formatter, video_selector
 from src import linkedin_poster, facebook_poster, notifier
-from src import imagen_client
+from src import imagen_client, instagram_poster
 from config import config
 
 setup_logging()
@@ -109,12 +109,13 @@ def _do_post(li_text: str, fb_text: str, video_path: str | None, image_path: str
 
 
 def publish_draft(draft: dict):
-    """Post an approved draft to LinkedIn and Facebook. Called by the approval server."""
+    """Post an approved draft to LinkedIn, Facebook, and optionally Instagram."""
     logger.info(f"Publishing approved draft: {draft['draft_id']}")
-    li_text = draft["linkedin_text"]
-    fb_text = draft["facebook_text"]
+    li_text = draft.get("linkedin_text", "")
+    fb_text = draft.get("facebook_text", "")
     video_path = draft.get("video_path")
     image_path = draft.get("image_path")
+    image_url = draft.get("image_url", "")  # URL-based image from Create page
 
     if video_path and not os.path.exists(video_path):
         logger.warning(f"Video file missing: {video_path}, falling back")
@@ -126,6 +127,26 @@ def publish_draft(draft: dict):
     li_result, fb_result = _do_post(li_text, fb_text, video_path, image_path)
     media_used = "video" if video_path else ("image" if image_path else "text_only")
 
+    # Instagram (only for drafts that have instagram selected as a platform)
+    ig_result = {"success": False, "post_id": None, "error": "not selected"}
+    platforms = draft.get("platforms", [])
+    if "instagram" in platforms and config.instagram_enabled:
+        ig_caption = draft.get("instagram_caption") or draft.get("post_text", li_text)
+        video_url = draft.get("video_url", "")
+        if video_path:
+            # Local video file — cannot use directly with Instagram (needs public URL)
+            ig_result = {"success": False, "post_id": None, "error": "Local video file not supported for Instagram; use a public video URL"}
+        elif video_url:
+            ig_result = instagram_poster.post_video(ig_caption, video_url)
+        elif image_path:
+            # Local file — cannot use with Instagram
+            ig_result = {"success": False, "post_id": None, "error": "Local image file not supported for Instagram; use an image URL"}
+        elif image_url:
+            ig_result = instagram_poster.post_image(ig_caption, image_url)
+        else:
+            ig_result = {"success": False, "post_id": None, "error": "Instagram requires an image or video URL"}
+        logger.info(f"Instagram: {'OK' if ig_result['success'] else 'FAILED'} — {ig_result.get('error') or ig_result.get('post_id')}")
+
     record = log_execution(
         theme=draft["theme"],
         video_type=draft.get("video_type", "none"),
@@ -134,15 +155,18 @@ def publish_draft(draft: dict):
         content_preview=draft.get("post_text", li_text),
     )
     record["media_used"] = media_used
+    record["instagram"] = ig_result
     _cleanup(video_path, image_path)
 
     if not record["overall_success"]:
         notifier.send_error_email(record)
 
+    ig_summary = f" | Instagram: {'OK' if ig_result['success'] else 'N/A'}" if "instagram" in platforms else ""
     logger.info(
         f"Draft published | Media: {media_used} | "
         f"LinkedIn: {'OK' if li_result['success'] else 'FAILED'} | "
         f"Facebook: {'OK' if fb_result['success'] else 'FAILED'}"
+        + ig_summary
     )
 
 

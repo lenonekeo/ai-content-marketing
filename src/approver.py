@@ -7,6 +7,12 @@ Routes:
   POST /setup         Save settings to .env
   GET  /influence     Content influence / brand guidelines form
   POST /influence     Save influence settings
+  GET  /calendar      Calendar view of all posts
+  GET  /create        AI chat-based content creation page
+  POST /create/chat   Chat endpoint (multi-turn AI conversation)
+  POST /create/save   Save a draft from the Create page
+  POST /create/image  Generate an AI image via Gemini
+  GET  /media/<file>  Serve generated media from downloads/
   GET  /review?token  Review/edit draft before publishing
   GET  /reject?token  Reject a draft
   POST /publish?token Publish an approved (possibly edited) draft
@@ -232,7 +238,7 @@ def _build_calendar_data() -> list[dict]:
             "status": "posted",
             "theme_name": r.get("theme", "unknown").replace("_", " ").title(),
             "industry": "",
-            "preview": r.get("content_preview", "")[:100],
+            "preview": r.get("content_preview", ""),
             "li_ok": r.get("linkedin", {}).get("success", False),
             "fb_ok": r.get("facebook", {}).get("success", False),
             "token": None,
@@ -244,7 +250,7 @@ def _build_calendar_data() -> list[dict]:
             dt = datetime.fromisoformat(d["timestamp"]).replace(tzinfo=None)
         except Exception:
             continue
-        preview = (d.get("linkedin_text") or d.get("facebook_text") or "")[:100]
+        preview = d.get("linkedin_text") or d.get("facebook_text") or d.get("instagram_caption") or ""
         status = d.get("status", "pending")
         entries.append({
             "dt": dt,
@@ -357,12 +363,58 @@ textarea { resize: vertical; min-height: 110px; line-height: 1.6; }
             padding-top:3px; white-space:nowrap; }
 .cal-info { flex:1; font-size:13px; }
 .cal-preview { color:#999; font-size:12px; margin-top:3px; font-style:italic; }
+@keyframes spin { from { transform:rotate(0deg) } to { transform:rotate(360deg) } }
+.spinner { display:inline-block; width:28px; height:28px; border:3px solid #e0e0e0;
+           border-top-color:#2ecc71; border-radius:50%; animation:spin .8s linear infinite; }
 @media (max-width: 620px) {
   .grid-2, .grid-3 { grid-template-columns: 1fr; }
   nav { padding: 0 16px; }
   .nav-brand { font-size: 15px; margin-right: 12px; }
   .nav-links a { padding: 6px 10px; font-size: 13px; }
 }
+.plt-row { display:flex; gap:10px; flex-wrap:wrap; }
+.plt-chk { display:inline-flex; align-items:center; gap:8px; padding:9px 16px;
+           border:1.5px solid #e0e0e0; border-radius:8px; cursor:pointer;
+           font-weight:600; font-size:13px; color:#777; transition:all .15s;
+           user-select:none; }
+.plt-chk:has(input:checked) { border-color:#2ecc71; background:#f0fff4; color:#1e8449; }
+.plt-chk input { display:none; }
+.type-row { display:flex; gap:8px; }
+.type-lbl { display:inline-flex; align-items:center; gap:6px; padding:7px 14px;
+            border:1.5px solid #e0e0e0; border-radius:8px; cursor:pointer;
+            font-size:13px; font-weight:600; color:#777; transition:all .15s;
+            user-select:none; }
+.type-lbl:has(input:checked) { border-color:#3498db; background:#eaf4fd; color:#2980b9; }
+.type-lbl input { display:none; }
+details.content-expand { margin-top:5px; }
+details.content-expand summary { cursor:pointer; color:#2ecc71; font-size:12px;
+  font-weight:600; list-style:none; display:inline-block; }
+details.content-expand summary::-webkit-details-marker { display:none; }
+.post-text-box { background:#f8f9fa; border-radius:6px; padding:12px 14px;
+  font-size:13px; color:#555; line-height:1.6; white-space:pre-wrap;
+  margin-top:8px; max-height:340px; overflow-y:auto; border:1px solid #eee; }
+.img-preview-box img { max-width:100%; max-height:280px; border-radius:8px;
+  display:none; border:1px solid #e0e0e0; margin-top:10px; }
+/* Chat UI */
+.chat-window { height:420px; overflow-y:auto; padding:16px 0; display:flex;
+  flex-direction:column; gap:14px; }
+.chat-msg { display:flex; gap:10px; align-items:flex-start; }
+.chat-msg.user { flex-direction:row-reverse; }
+.chat-bubble { max-width:80%; padding:11px 15px; border-radius:12px;
+  font-size:14px; line-height:1.6; white-space:pre-wrap; }
+.chat-msg.user .chat-bubble { background:#2ecc71; color:#fff; border-bottom-right-radius:3px; }
+.chat-msg.ai .chat-bubble { background:#f0f2f5; color:#333; border-bottom-left-radius:3px; }
+.chat-avatar { width:32px; height:32px; border-radius:50%; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center; font-size:14px;
+  font-weight:700; }
+.chat-msg.user .chat-avatar { background:#2ecc71; color:#fff; }
+.chat-msg.ai .chat-avatar { background:#1a1a2e; color:#fff; }
+.chat-input-row { display:flex; gap:10px; margin-top:12px; }
+.chat-input-row textarea { flex:1; resize:none; min-height:60px; max-height:120px; }
+.use-this-btn { font-size:11px; padding:4px 10px; margin-top:6px; cursor:pointer;
+  background:#f0f2f5; border:1px solid #e0e0e0; border-radius:6px; color:#555;
+  font-weight:600; transition:all .15s; }
+.use-this-btn:hover { background:#2ecc71; color:#fff; border-color:#2ecc71; }
 """
 
 
@@ -375,7 +427,7 @@ def _head(title: str) -> str:
 
 
 def _nav(active: str = "") -> str:
-    pages = [("/", "Dashboard"), ("/setup", "Setup"), ("/influence", "Content Influence"), ("/calendar", "Calendar")]
+    pages = [("/", "Dashboard"), ("/create", "Create"), ("/setup", "Setup"), ("/influence", "Content Influence"), ("/calendar", "Calendar")]
     links = "".join(
         f'<a href="{href}" class="{"active" if active == href else ""}">{name}</a>'
         for href, name in pages
@@ -430,6 +482,17 @@ def _page_dashboard(alert: str = "") -> str:
             li_badge = 'badge-ok">OK' if li.get("success") else 'badge-fail">FAIL'
             fb_badge = 'badge-ok">OK' if fb.get("success") else 'badge-fail">FAIL'
             media = r.get("media_used", r.get("video_type", "?"))
+            preview = r.get("content_preview", "")
+            short = preview[:180]
+            if len(preview) > 180:
+                preview_html = f"""<details class="content-expand">
+  <summary>{_esc(short)}… (show full post)</summary>
+  <div class="post-text-box">{_esc(preview)}</div>
+</details>"""
+            elif preview:
+                preview_html = f'<div class="log-detail">{_esc(preview)}</div>'
+            else:
+                preview_html = ""
             logs_html += f"""
 <div class="log-row">
   <div class="log-title">{theme} &nbsp;·&nbsp; {ts}
@@ -437,7 +500,7 @@ def _page_dashboard(alert: str = "") -> str:
     &nbsp;<span class="badge {li_badge}</span> LinkedIn
     &nbsp;<span class="badge {fb_badge}</span> Facebook
   </div>
-  <div class="log-detail">{_esc(r.get("content_preview", "")[:100])}...</div>
+  {preview_html}
 </div>"""
     else:
         logs_html = '<p class="empty">No posts yet</p>'
@@ -571,6 +634,23 @@ def _page_setup(alert: str = "", alert_type: str = "success") -> str:
         <label>Page ID</label>
         <input type="text" name="FACEBOOK_PAGE_ID" value="{val("FACEBOOK_PAGE_ID")}">
       </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Instagram</div>
+      <div class="field">
+        <label>Access Token <span class="hint">leave blank to keep current — same as Facebook Page Access Token</span></label>
+        <input type="password" name="INSTAGRAM_ACCESS_TOKEN" placeholder="{masked("INSTAGRAM_ACCESS_TOKEN") or "EAA..."}">
+      </div>
+      <div class="field">
+        <label>Instagram Account ID <span class="hint">numeric ID of your Instagram Business/Creator account</span></label>
+        <input type="text" name="INSTAGRAM_ACCOUNT_ID" value="{val("INSTAGRAM_ACCOUNT_ID")}" placeholder="17841400000000000">
+      </div>
+      <p style="font-size:12px;color:#aaa;margin-top:4px">
+        Requires an Instagram Business or Creator account connected to your Facebook Page.
+        The token needs <strong>instagram_basic</strong> and <strong>instagram_content_publish</strong> permissions.
+        Instagram posts require an image or video — text-only posts are not supported.
+      </p>
     </div>
 
     <div class="card">
@@ -795,7 +875,17 @@ def _page_calendar() -> str:
                 extra = ""
 
             industry = f' &nbsp;·&nbsp; <span style="color:#888">{_esc(e["industry"])}</span>' if e.get("industry") else ""
-            preview_html = f'<div class="cal-preview">{_esc(e["preview"][:120])}{"..." if len(e.get("preview","")) > 120 else ""}</div>' if e.get("preview") else ""
+            preview = e.get("preview", "")
+            short = preview[:180]
+            if len(preview) > 180:
+                preview_html = f"""<details class="content-expand">
+  <summary>{_esc(short)}… (show full post)</summary>
+  <div class="post-text-box">{_esc(preview)}</div>
+</details>"""
+            elif preview:
+                preview_html = f'<div class="cal-preview">{_esc(preview)}</div>'
+            else:
+                preview_html = ""
 
             html += f"""<div class="cal-entry">
   <div class="cal-time">{time_str}</div>
@@ -829,6 +919,331 @@ def _page_calendar() -> str:
 </div></body></html>"""
 
 
+def _page_create(alert: str = "", alert_type: str = "success") -> str:
+    from config import config as _cfg
+    default_role = f"You are an expert content marketer and copywriter for {_cfg.business_name}. Your goal is to write engaging, professional social media content that drives business results."
+    alert_html = f'<div class="alert alert-{alert_type}">{alert}</div>' if alert else ""
+
+    return _head("Create Content") + _nav("/create") + f"""
+<div class="container">
+  {alert_html}
+  <h1>Create Content</h1>
+  <p class="subtitle">
+    Chat with the AI to craft your post. Describe your idea, ask for revisions, and say
+    <strong>"write a LinkedIn post about X"</strong> or <strong>"make it shorter"</strong>.
+    When you're happy with a response, click <strong>Use this</strong> to edit and save it as a draft.
+  </p>
+
+  <div class="card">
+    <div class="card-title">Settings</div>
+    <div class="field">
+      <label>AI Role <span class="hint">the persona and context for the AI — auto-filled from your business info</span></label>
+      <textarea id="system_role" style="min-height:80px">{_esc(default_role)}</textarea>
+    </div>
+    <div class="grid-2" style="margin-top:16px">
+      <div class="field">
+        <label>Platforms</label>
+        <div class="plt-row">
+          <label class="plt-chk"><input type="checkbox" id="plt-linkedin" checked> LinkedIn</label>
+          <label class="plt-chk"><input type="checkbox" id="plt-facebook" checked> Facebook</label>
+          <label class="plt-chk"><input type="checkbox" id="plt-instagram"> Instagram</label>
+        </div>
+      </div>
+      <div class="field">
+        <label>Content Type</label>
+        <div class="type-row">
+          <label class="type-lbl"><input type="radio" name="ctype" value="post" checked> Organic Post</label>
+          <label class="type-lbl"><input type="radio" name="ctype" value="ad"> Sponsored Ad</label>
+        </div>
+      </div>
+    </div>
+    <p style="font-size:12px;color:#aaa;margin-top:10px">
+      Content Influence settings (topics, brand voice, audience, inspiration URLs) are applied automatically.
+      <a href="/influence" style="color:#2ecc71">Manage →</a>
+    </p>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Chat</div>
+    <div class="chat-window" id="chat-window">
+      <div class="chat-msg ai">
+        <div class="chat-avatar">AI</div>
+        <div class="chat-bubble">Hello! I&apos;m ready to help you create great social media content. Tell me what you&apos;d like to post about, and I&apos;ll write it for your selected platforms. You can ask me to refine, shorten, or change the tone at any time.</div>
+      </div>
+    </div>
+    <div id="error-box" class="alert alert-error" style="display:none;margin-top:12px"></div>
+    <div class="chat-input-row">
+      <textarea id="chat-input" placeholder="Write a post about... / Make it shorter / Change the tone to..." onkeydown="handleKey(event)"></textarea>
+      <button id="send-btn" class="btn btn-primary" onclick="sendMessage()" style="align-self:flex-end">Send</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;margin-top:10px">
+      <span id="spinner" style="display:none"><span class="spinner"></span>
+        <span style="color:#888;font-size:13px;margin-left:8px">Thinking...</span></span>
+      <button class="btn btn-ghost" onclick="clearChat()" style="font-size:13px;padding:7px 14px">Clear chat</button>
+    </div>
+  </div>
+
+  <div id="draft-section" style="display:none">
+    <div class="card">
+      <div class="card-title">Edit &amp; Save Draft</div>
+      <p style="font-size:13px;color:#888;margin-bottom:16px">Edit the content below before saving. Each platform&apos;s text is independent.</p>
+      <div id="li-field" class="field">
+        <label>LinkedIn Post <span class="hint">editable</span></label>
+        <textarea id="linkedin_text" style="min-height:200px"></textarea>
+      </div>
+      <div id="fb-field" class="field" style="margin-top:16px">
+        <label>Facebook Post <span class="hint">editable</span></label>
+        <textarea id="facebook_text" style="min-height:180px"></textarea>
+      </div>
+      <div id="ig-field" class="field" style="margin-top:16px;display:none">
+        <label>Instagram Caption <span class="hint">editable — max ~150 words for best reach</span></label>
+        <textarea id="instagram_caption" style="min-height:150px"></textarea>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Media <span class="hint">optional — attach an image or video to your post</span></div>
+      <div class="grid-2">
+        <div class="field">
+          <label>Image URL <span class="hint">publicly accessible HTTPS link</span></label>
+          <input type="text" id="image_url" placeholder="https://..." oninput="previewImage()">
+          <div class="img-preview-box"><img id="img-preview" src="" alt="Preview"></div>
+        </div>
+        <div class="field">
+          <label>Video URL <span class="hint">publicly accessible MP4 link</span></label>
+          <input type="text" id="video_url" placeholder="https://...">
+        </div>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:10px;align-items:center">
+        <button class="btn btn-ghost" onclick="generateAIImage()">Generate AI Image</button>
+        <span id="img-spinner" style="display:none"><span class="spinner" style="width:20px;height:20px;border-width:2px"></span></span>
+        <span id="img-status" style="font-size:13px;color:#888"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Schedule</div>
+      <div class="field">
+        <div style="display:flex;gap:20px;margin-bottom:12px;flex-wrap:wrap">
+          <label style="display:inline-flex;align-items:center;gap:8px;font-weight:normal;cursor:pointer">
+            <input type="radio" name="sched_type" value="now" checked onchange="toggleSchedule()">
+            Save as draft (publish manually via Dashboard)
+          </label>
+          <label style="display:inline-flex;align-items:center;gap:8px;font-weight:normal;cursor:pointer">
+            <input type="radio" name="sched_type" value="later" onchange="toggleSchedule()">
+            Schedule for a specific date &amp; time
+          </label>
+        </div>
+        <div id="sched-picker" style="display:none">
+          <label>Date &amp; Time <span class="hint">UTC — post will publish automatically at this time</span></label>
+          <input type="datetime-local" id="scheduled_at" style="max-width:280px">
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:0">
+      <div class="section-actions">
+        <button id="save-btn" class="btn btn-primary" onclick="saveAsDraft()">Save as Draft</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('draft-section').style.display='none'">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let messages = [];
+let selectedPlatforms = ["linkedin", "facebook"];
+
+function getSelectedPlatforms() {{
+  return ["linkedin","facebook","instagram"].filter(p => document.getElementById("plt-"+p).checked);
+}}
+function getContentType() {{
+  return document.querySelector('input[name="ctype"]:checked').value;
+}}
+
+function handleKey(e) {{
+  if (e.key === "Enter" && !e.shiftKey) {{
+    e.preventDefault();
+    sendMessage();
+  }}
+}}
+
+async function sendMessage() {{
+  const input = document.getElementById("chat-input").value.trim();
+  if (!input) return;
+  selectedPlatforms = getSelectedPlatforms();
+  if (!selectedPlatforms.length) {{ showError("Select at least one platform."); return; }}
+
+  appendMsg("user", input);
+  document.getElementById("chat-input").value = "";
+  messages.push({{role: "user", content: input}});
+
+  setLoading(true);
+  document.getElementById("error-box").style.display = "none";
+
+  try {{
+    const systemRole = document.getElementById("system_role").value.trim();
+    const ctype = getContentType();
+    const platformNote = selectedPlatforms.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(", ");
+    const typeNote = ctype === "ad" ? "sponsored ad copy" : "organic social media post";
+    // Add platform context to user's first substantive message via system
+    const contextualRole = systemRole +
+      `\\n\\nYou are writing ${{typeNote}} for: ${{platformNote}}.` +
+      (ctype === "ad" ? " Use persuasive, action-oriented language with a strong CTA. Keep it concise." :
+       " Write naturally and professionally. Include 3-5 relevant hashtags.");
+
+    const resp = await fetch("/create/chat", {{
+      method: "POST",
+      headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
+      body: "messages=" + encodeURIComponent(JSON.stringify(messages)) +
+            "&system_role=" + encodeURIComponent(contextualRole)
+    }});
+    const data = await resp.json();
+    if (data.error) {{
+      showError(data.error);
+      messages.pop();
+    }} else {{
+      messages.push({{role: "assistant", content: data.reply}});
+      appendMsg("ai", data.reply, true);
+    }}
+  }} catch(e) {{
+    showError("Request failed: " + e.message);
+    messages.pop();
+  }} finally {{
+    setLoading(false);
+  }}
+}}
+
+function appendMsg(role, text, showUseThis=false) {{
+  const win = document.getElementById("chat-window");
+  const div = document.createElement("div");
+  div.className = "chat-msg " + role;
+  const escaped = text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  let extra = "";
+  if (showUseThis) {{
+    extra = `<br><button class="use-this-btn" onclick="useThis(${{JSON.stringify(text)}})">Use this ↓</button>`;
+  }}
+  div.innerHTML = `<div class="chat-avatar">${{role === "user" ? "You" : "AI"}}</div>
+    <div><div class="chat-bubble">${{escaped}}</div>${{extra}}</div>`;
+  win.appendChild(div);
+  win.scrollTop = win.scrollHeight;
+}}
+
+function useThis(text) {{
+  const platforms = getSelectedPlatforms();
+  // Show draft section with platform fields
+  document.getElementById("li-field").style.display = platforms.includes("linkedin") ? "" : "none";
+  document.getElementById("fb-field").style.display = platforms.includes("facebook") ? "" : "none";
+  document.getElementById("ig-field").style.display = platforms.includes("instagram") ? "" : "none";
+  // Populate all selected fields with the AI text (user can edit per-platform)
+  if (platforms.includes("linkedin")) document.getElementById("linkedin_text").value = text;
+  if (platforms.includes("facebook")) document.getElementById("facebook_text").value = text;
+  if (platforms.includes("instagram")) document.getElementById("instagram_caption").value = text;
+  document.getElementById("draft-section").style.display = "block";
+  document.getElementById("draft-section").scrollIntoView({{behavior:"smooth",block:"start"}});
+}}
+
+async function saveAsDraft() {{
+  const li = document.getElementById("linkedin_text").value.trim();
+  const fb = document.getElementById("facebook_text").value.trim();
+  const ig = document.getElementById("instagram_caption").value.trim();
+  if (!li && !fb && !ig) {{ showError("Nothing to save."); return; }}
+  const platforms = getSelectedPlatforms();
+  const schedType = document.querySelector('input[name="sched_type"]:checked').value;
+  const scheduledAt = schedType === "later" ? document.getElementById("scheduled_at").value : "";
+  const imageUrl = document.getElementById("image_url").value.trim();
+  const videoUrl = document.getElementById("video_url").value.trim();
+  const btn = document.getElementById("save-btn");
+  btn.disabled = true; btn.textContent = "Saving...";
+  try {{
+    let params = "linkedin_text=" + encodeURIComponent(li) +
+                 "&facebook_text=" + encodeURIComponent(fb) +
+                 "&instagram_caption=" + encodeURIComponent(ig) +
+                 "&scheduled_at=" + encodeURIComponent(scheduledAt) +
+                 "&image_url=" + encodeURIComponent(imageUrl) +
+                 "&video_url=" + encodeURIComponent(videoUrl);
+    platforms.forEach(p => {{ params += "&platforms=" + encodeURIComponent(p); }});
+    const resp = await fetch("/create/save", {{
+      method:"POST", headers:{{"Content-Type":"application/x-www-form-urlencoded"}}, body: params
+    }});
+    const data = await resp.json();
+    if (data.redirect) {{
+      window.location.href = data.redirect;
+    }} else if (data.error) {{
+      showError(data.error);
+      btn.disabled = false; btn.textContent = "Save as Draft";
+    }}
+  }} catch(e) {{
+    showError("Failed: " + e.message);
+    btn.disabled = false; btn.textContent = "Save as Draft";
+  }}
+}}
+
+async function generateAIImage() {{
+  const input = document.getElementById("chat-input").value.trim() ||
+                (messages.length > 0 ? messages[messages.length-1].content : "business automation");
+  const btn = event.target;
+  btn.disabled = true;
+  document.getElementById("img-spinner").style.display = "inline-flex";
+  document.getElementById("img-status").textContent = "Generating image...";
+  try {{
+    const resp = await fetch("/create/image", {{
+      method:"POST", headers:{{"Content-Type":"application/x-www-form-urlencoded"}},
+      body: "prompt=" + encodeURIComponent(input)
+    }});
+    const data = await resp.json();
+    if (data.url) {{
+      document.getElementById("image_url").value = data.url;
+      previewImage();
+      document.getElementById("img-status").textContent = "Image generated!";
+    }} else {{
+      document.getElementById("img-status").textContent = data.error || "Generation failed";
+    }}
+  }} catch(e) {{
+    document.getElementById("img-status").textContent = "Error: " + e.message;
+  }} finally {{
+    btn.disabled = false;
+    document.getElementById("img-spinner").style.display = "none";
+  }}
+}}
+
+function previewImage() {{
+  const url = document.getElementById("image_url").value.trim();
+  const img = document.getElementById("img-preview");
+  img.src = url;
+  img.style.display = url ? "block" : "none";
+}}
+
+function toggleSchedule() {{
+  const later = document.querySelector('input[name="sched_type"][value="later"]').checked;
+  document.getElementById("sched-picker").style.display = later ? "block" : "none";
+}}
+
+function clearChat() {{
+  messages = [];
+  const win = document.getElementById("chat-window");
+  win.innerHTML = `<div class="chat-msg ai">
+    <div class="chat-avatar">AI</div>
+    <div class="chat-bubble">Chat cleared. What would you like to create?</div>
+  </div>`;
+  document.getElementById("error-box").style.display = "none";
+  document.getElementById("draft-section").style.display = "none";
+}}
+
+function setLoading(on) {{
+  document.getElementById("send-btn").disabled = on;
+  document.getElementById("spinner").style.display = on ? "inline-flex" : "none";
+}}
+
+function showError(msg) {{
+  const box = document.getElementById("error-box");
+  box.textContent = msg;
+  box.style.display = "block";
+}}
+</script>
+</body></html>"""
+
+
 # ---------------------------------------------------------------------------
 # HTTP Handler
 # ---------------------------------------------------------------------------
@@ -837,7 +1252,8 @@ _publish_callback = None  # set by start_approval_server
 
 _SENSITIVE_KEYS = {
     "OPENAI_API_KEY", "HEYGEN_API_KEY", "GOOGLE_API_KEY",
-    "LINKEDIN_ACCESS_TOKEN", "FACEBOOK_ACCESS_TOKEN", "SMTP_PASSWORD",
+    "LINKEDIN_ACCESS_TOKEN", "FACEBOOK_ACCESS_TOKEN",
+    "INSTAGRAM_ACCESS_TOKEN", "SMTP_PASSWORD",
 }
 
 _SETUP_KEYS = {
@@ -846,6 +1262,7 @@ _SETUP_KEYS = {
     "GOOGLE_API_KEY", "GOOGLE_PROJECT_ID",
     "LINKEDIN_ACCESS_TOKEN", "LINKEDIN_PERSON_URN", "LINKEDIN_ORG_URN",
     "FACEBOOK_ACCESS_TOKEN", "FACEBOOK_PAGE_ID",
+    "INSTAGRAM_ACCESS_TOKEN", "INSTAGRAM_ACCOUNT_ID",
     "BUSINESS_NAME", "BUSINESS_WEBSITE", "CONTACT_EMAIL",
     "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD",
     "POST_DAYS", "POST_HOUR", "POST_MINUTE",
@@ -869,6 +1286,10 @@ class _Handler(BaseHTTPRequestHandler):
                 self._send(200, _page_influence())
             elif p.path == "/calendar":
                 self._send(200, _page_calendar())
+            elif p.path == "/create":
+                self._send(200, _page_create())
+            elif p.path.startswith("/media/"):
+                self._serve_media(p.path[7:])
             elif p.path == "/review":
                 self._review(token)
             elif p.path == "/reject":
@@ -898,6 +1319,12 @@ class _Handler(BaseHTTPRequestHandler):
                 self._save_setup(body)
             elif p.path == "/influence":
                 self._save_influence(body)
+            elif p.path == "/create/chat":
+                self._chat_create(body)
+            elif p.path == "/create/save":
+                self._save_content_draft(body)
+            elif p.path == "/create/image":
+                self._generate_ai_image(body)
             elif p.path == "/publish":
                 li = body.get("linkedin_text", [""])[0]
                 fb = body.get("facebook_text", [""])[0]
@@ -967,6 +1394,129 @@ class _Handler(BaseHTTPRequestHandler):
         save_influence(data)
         logger.info("Influence settings saved")
         self._send(200, _page_influence(alert="Content influence settings saved. Next generated post will use these guidelines."))
+
+    def _chat_create(self, body: dict):
+        """Handle multi-turn AI chat for content creation."""
+        import json as _json
+        messages_raw = body.get("messages", ["[]"])[0]
+        system_role = body.get("system_role", [""])[0].strip()
+        try:
+            messages = _json.loads(messages_raw)
+        except Exception:
+            messages = []
+        if not messages:
+            self._send_json({"error": "No messages provided."})
+            return
+        try:
+            from openai import OpenAI
+            from config import config
+            from src.influence import get_prompt_context
+
+            # Build system prompt: role + influence context
+            system_content = system_role or f"You are an expert content marketer for {config.business_name}."
+            ctx = get_prompt_context()
+            if ctx:
+                system_content += ctx
+
+            full_messages = [{"role": "system", "content": system_content}] + messages
+
+            client = OpenAI(api_key=config.openai_api_key)
+            resp = client.chat.completions.create(
+                model=config.openai_model,
+                messages=full_messages,
+                temperature=config.openai_temperature,
+                max_tokens=800,
+            )
+            reply = resp.choices[0].message.content.strip()
+            self._send_json({"reply": reply})
+        except Exception as e:
+            logger.exception("Error in chat create")
+            self._send_json({"error": str(e)})
+
+    def _save_content_draft(self, body: dict):
+        li = body.get("linkedin_text", [""])[0].strip()
+        fb = body.get("facebook_text", [""])[0].strip()
+        ig = body.get("instagram_caption", [""])[0].strip()
+        platforms = body.get("platforms", [])
+        scheduled_at = body.get("scheduled_at", [""])[0].strip()
+        image_url = body.get("image_url", [""])[0].strip()
+        video_url = body.get("video_url", [""])[0].strip()
+        if not li and not fb and not ig:
+            self._send_json({"error": "No content to save."})
+            return
+        draft_data = {
+            "theme": "custom",
+            "industry": "Custom",
+            "linkedin_text": li,
+            "facebook_text": fb,
+            "instagram_caption": ig,
+            "platforms": platforms,
+            "content_preview": (li or fb or ig)[:300],
+        }
+        if scheduled_at:
+            draft_data["scheduled_at"] = scheduled_at
+        if image_url:
+            draft_data["image_url"] = image_url
+        if video_url:
+            draft_data["video_url"] = video_url
+        draft = save_draft(draft_data)
+        # Only send approval email for manual drafts (not auto-scheduled)
+        if not scheduled_at:
+            try:
+                from src.notifier import send_approval_email
+                from config import config
+                review_url = f"http://{config.vps_host}:{config.approval_port}/review?token={draft['token']}"
+                send_approval_email(draft, review_url)
+            except Exception as e:
+                logger.warning(f"Could not send approval email: {e}")
+        self._send_json({"redirect": "/"})
+
+    def _send_json(self, data: dict):
+        body = json.dumps(data).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _serve_media(self, filename: str):
+        """Serve a file from the downloads/ directory."""
+        # Basic safety: strip path traversal
+        filename = os.path.basename(filename)
+        filepath = os.path.join("downloads", filename)
+        if not os.path.exists(filepath) or not os.path.isfile(filepath):
+            self._send(404, self._simple_page("Not found", "File not found.", "#e74c3c"))
+            return
+        ext = os.path.splitext(filename)[1].lower()
+        ctype = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+                 ".mp4": "video/mp4", ".gif": "image/gif"}.get(ext, "application/octet-stream")
+        with open(filepath, "rb") as f:
+            data = f.read()
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _generate_ai_image(self, body: dict):
+        """Generate an AI image via Gemini Imagen and return a URL to serve it."""
+        prompt = body.get("prompt", [""])[0].strip() or "professional business automation"
+        try:
+            from src import imagen_client
+            from config import config
+            if not config.imagen_enabled:
+                self._send_json({"error": "Google API key not configured. Add GOOGLE_API_KEY in Setup."})
+                return
+            import datetime as _dt
+            ts = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+            img_prompt = imagen_client.build_image_prompt("custom", prompt, "Business")
+            image_path = imagen_client.generate_image(img_prompt, filename=f"create_{ts}.png")
+            fname = os.path.basename(image_path)
+            url = f"http://{config.vps_host}:{config.approval_port}/media/{fname}"
+            self._send_json({"url": url})
+        except Exception as e:
+            logger.exception("AI image generation failed")
+            self._send_json({"error": str(e)})
 
     # ------------------------------------------------------------------
     # Draft review handlers
@@ -1076,4 +1626,31 @@ def start_approval_server(publish_callback, port: int = 8080):
     t = threading.Thread(target=server.serve_forever, daemon=True)
     t.start()
     logger.info(f"Admin server started on port {port}")
+
+    def _scheduled_publisher():
+        import time as _time
+        while True:
+            _time.sleep(60)
+            try:
+                now = datetime.utcnow()
+                for d in _list_pending_drafts():
+                    sat = d.get("scheduled_at", "").strip()
+                    if not sat:
+                        continue
+                    try:
+                        sdt = datetime.fromisoformat(sat).replace(tzinfo=None)
+                        if sdt <= now:
+                            d["status"] = "approved"
+                            _update_draft(d)
+                            if _publish_callback:
+                                threading.Thread(target=_publish_callback, args=(d,), daemon=True).start()
+                            logger.info(f"Auto-published scheduled draft: {d['draft_id']}")
+                    except Exception as e:
+                        logger.warning(f"Could not process scheduled draft {d.get('draft_id')}: {e}")
+            except Exception as e:
+                logger.warning(f"Scheduled publisher error: {e}")
+
+    sp = threading.Thread(target=_scheduled_publisher, daemon=True)
+    sp.start()
+    logger.info("Scheduled post publisher started (checks every 60s)")
     return server
