@@ -19,8 +19,10 @@ THEMES = [
         ),
         "script_prompt": (
             "Convert the following social media post into a 30-45 second spoken video script "
-            "for an AI avatar. Make it natural, engaging, and conversational. "
-            "Remove all hashtags and website links. Start directly with the content.\n\nPost:\n{post}"
+            "for an energetic AI avatar. Use a high-energy, enthusiastic, and dynamic delivery. "
+            "Short punchy sentences. Varied pacing — start fast, slow down for key points. "
+            "Conversational and direct, as if talking to a friend. "
+            "Remove all hashtags and website links. Start immediately with impact.\n\nPost:\n{post}"
         ),
         "veo_prompt": None,
     },
@@ -65,7 +67,9 @@ THEMES = [
         ),
         "script_prompt": (
             "Convert the following social media post into a 30-45 second spoken video script "
-            "for an AI avatar delivering a client success story. Warm, credible, inspiring tone. "
+            "for an energetic AI avatar delivering a client success story. "
+            "Enthusiastic and inspiring — like sharing exciting news with a colleague. "
+            "Build momentum toward the result. Use emphasis on the key win. "
             "Remove all hashtags and website links.\n\nPost:\n{post}"
         ),
         "veo_prompt": None,
@@ -135,8 +139,10 @@ THEMES = [
         ),
         "script_prompt": (
             "Convert the following social media post into a 30-45 second educational video script "
-            "for an AI avatar explaining a concept clearly and simply. "
-            "Friendly, knowledgeable teacher tone. Remove all hashtags and website links.\n\nPost:\n{post}"
+            "for an energetic AI avatar explaining a concept. "
+            "Excited about the topic — like sharing something that genuinely blows your mind. "
+            "Keep it simple, punchy, and easy to follow. High energy from the first word. "
+            "Remove all hashtags and website links.\n\nPost:\n{post}"
         ),
         "veo_prompt": None,
     },
@@ -159,7 +165,8 @@ THEMES = [
         ),
         "script_prompt": (
             "Convert the following social media post into a 30-45 second service pitch video script "
-            "for an AI avatar. Confident, professional, value-focused. "
+            "for an energetic AI avatar. Bold and confident — like someone who truly believes in what they do. "
+            "High energy opening, punchy sentences, strong close. "
             "Remove all hashtags and website links.\n\nPost:\n{post}"
         ),
         "veo_prompt": None,

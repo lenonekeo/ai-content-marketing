@@ -18,7 +18,7 @@ def create_video(script: str) -> str:
                 "character": {
                     "type": "avatar",
                     "avatar_id": config.heygen_avatar_id,
-                    "avatar_style": "normal",
+                    "avatar_style": "happy",
                 },
                 "voice": {
                     "type": "text",
@@ -27,8 +27,8 @@ def create_video(script: str) -> str:
                 },
             }
         ],
-        "dimension": {"width": 1280, "height": 720},
-        "aspect_ratio": "16:9",
+        "dimension": {"width": 720, "height": 1280},
+        "aspect_ratio": "9:16",
     }
     headers = {
         "X-Api-Key": config.heygen_api_key,
