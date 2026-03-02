@@ -224,7 +224,7 @@ def _build_calendar_data() -> list[dict]:
     # Past posts from execution log
     for r in _read_all_logs():
         try:
-            dt = datetime.fromisoformat(r["timestamp"])
+            dt = datetime.fromisoformat(r["timestamp"]).replace(tzinfo=None)
         except Exception:
             continue
         entries.append({
@@ -241,7 +241,7 @@ def _build_calendar_data() -> list[dict]:
     # All drafts (pending, approved, rejected)
     for d in _list_all_drafts():
         try:
-            dt = datetime.fromisoformat(d["timestamp"])
+            dt = datetime.fromisoformat(d["timestamp"]).replace(tzinfo=None)
         except Exception:
             continue
         preview = (d.get("linkedin_text") or d.get("facebook_text") or "")[:100]
