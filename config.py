@@ -63,6 +63,7 @@ class Config:
 
     # Schedule
     post_hour: int = int(_optional("POST_HOUR", "9"))
+    post_minute: int = int(_optional("POST_MINUTE", "0"))
     post_days: str = _optional("POST_DAYS", "mon,wed,fri")
 
     # Approval workflow

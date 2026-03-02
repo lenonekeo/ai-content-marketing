@@ -151,6 +151,134 @@ def _read_recent_logs(n: int = 5) -> list[dict]:
     return records[-n:][::-1]
 
 
+def _read_all_logs() -> list[dict]:
+    logs_file = "logs/posts.jsonl"
+    if not os.path.exists(logs_file):
+        return []
+    records = []
+    try:
+        with open(logs_file) as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    records.append(json.loads(line))
+    except Exception:
+        pass
+    return records
+
+
+def _list_all_drafts() -> list[dict]:
+    """Return all drafts regardless of status, newest first."""
+    if not os.path.exists(DRAFTS_DIR):
+        return []
+    result = []
+    for fname in sorted(os.listdir(DRAFTS_DIR), reverse=True):
+        if not fname.endswith(".json"):
+            continue
+        try:
+            with open(os.path.join(DRAFTS_DIR, fname)) as f:
+                result.append(json.load(f))
+        except Exception:
+            pass
+    return result
+
+
+def _get_future_slots(n_weeks: int = 8) -> list:
+    """Return list of future scheduled datetimes (UTC) based on POST_DAYS + POST_HOUR + POST_MINUTE."""
+    from datetime import datetime, timedelta
+    from config import config
+
+    day_abbr_to_weekday = {
+        "mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6,
+    }
+    post_days = [
+        day_abbr_to_weekday[d.strip().lower()]
+        for d in config.post_days.split(",")
+        if d.strip().lower() in day_abbr_to_weekday
+    ]
+    post_hour = config.post_hour
+    post_minute = getattr(config, "post_minute", 0)
+
+    now = datetime.utcnow()
+    today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    end = today + timedelta(weeks=n_weeks)
+
+    slots = []
+    current = today
+    while current < end:
+        if current.weekday() in post_days:
+            slot_dt = current.replace(hour=post_hour, minute=post_minute)
+            if slot_dt > now:
+                slots.append(slot_dt)
+        current += timedelta(days=1)
+    return slots
+
+
+def _build_calendar_data() -> list[dict]:
+    """Build sorted list of all post entries: posted, drafts, and future planned."""
+    from datetime import datetime
+    from src.themes import THEMES, INDUSTRIES
+
+    entries = []
+
+    # Past posts from execution log
+    for r in _read_all_logs():
+        try:
+            dt = datetime.fromisoformat(r["timestamp"])
+        except Exception:
+            continue
+        entries.append({
+            "dt": dt,
+            "status": "posted",
+            "theme_name": r.get("theme", "unknown").replace("_", " ").title(),
+            "industry": "",
+            "preview": r.get("content_preview", "")[:100],
+            "li_ok": r.get("linkedin", {}).get("success", False),
+            "fb_ok": r.get("facebook", {}).get("success", False),
+            "token": None,
+        })
+
+    # All drafts (pending, approved, rejected)
+    for d in _list_all_drafts():
+        try:
+            dt = datetime.fromisoformat(d["timestamp"])
+        except Exception:
+            continue
+        preview = (d.get("linkedin_text") or d.get("facebook_text") or "")[:100]
+        status = d.get("status", "pending")
+        entries.append({
+            "dt": dt,
+            "status": status,
+            "theme_name": d.get("theme", "unknown").replace("_", " ").title(),
+            "industry": d.get("industry", ""),
+            "preview": preview,
+            "li_ok": None,
+            "fb_ok": None,
+            "token": d.get("token") if status == "pending" else None,
+        })
+
+    # Future planned (skip days that already have a pending/approved draft)
+    draft_dates = {e["dt"].date() for e in entries if e["status"] in ("pending", "approved")}
+    for slot_dt in _get_future_slots(n_weeks=8):
+        if slot_dt.date() not in draft_dates:
+            day_of_year = slot_dt.timetuple().tm_yday
+            theme = THEMES[day_of_year % len(THEMES)]
+            industry = INDUSTRIES[day_of_year % len(INDUSTRIES)]
+            entries.append({
+                "dt": slot_dt,
+                "status": "planned",
+                "theme_name": theme["name"],
+                "industry": industry,
+                "preview": "",
+                "li_ok": None,
+                "fb_ok": None,
+                "token": None,
+            })
+
+    entries.sort(key=lambda e: e["dt"])
+    return entries
+
+
 # ---------------------------------------------------------------------------
 # Shared HTML components
 # ---------------------------------------------------------------------------
@@ -213,6 +341,22 @@ textarea { resize: vertical; min-height: 110px; line-height: 1.6; }
 .log-detail { color: #888; }
 .empty { color: #bbb; font-size: 14px; padding: 20px 0; text-align: center; }
 .section-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
+.day-cb { display:inline-flex; align-items:center; justify-content:center;
+          width:52px; height:40px; border:1.5px solid #e0e0e0; border-radius:7px;
+          cursor:pointer; font-weight:600; font-size:13px; color:#888;
+          transition: all .15s; user-select:none; }
+.day-cb:has(input:checked) { background:#2ecc71; border-color:#2ecc71; color:#fff; }
+.day-cb input { display:none; }
+.cal-day-group { margin-bottom:20px; }
+.cal-date { font-weight:700; font-size:13px; color:#1a1a2e; padding:8px 0 6px;
+            border-bottom:2px solid #f0f0f0; margin-bottom:8px; letter-spacing:.3px; }
+.cal-entry { display:flex; gap:14px; padding:8px 0; border-bottom:1px solid #f8f8f8;
+             align-items:flex-start; }
+.cal-entry:last-child { border-bottom:none; }
+.cal-time { font-size:12px; font-weight:600; color:#aaa; min-width:64px;
+            padding-top:3px; white-space:nowrap; }
+.cal-info { flex:1; font-size:13px; }
+.cal-preview { color:#999; font-size:12px; margin-top:3px; font-style:italic; }
 @media (max-width: 620px) {
   .grid-2, .grid-3 { grid-template-columns: 1fr; }
   nav { padding: 0 16px; }
@@ -231,7 +375,7 @@ def _head(title: str) -> str:
 
 
 def _nav(active: str = "") -> str:
-    pages = [("/", "Dashboard"), ("/setup", "Setup"), ("/influence", "Content Influence")]
+    pages = [("/", "Dashboard"), ("/setup", "Setup"), ("/influence", "Content Influence"), ("/calendar", "Calendar")]
     links = "".join(
         f'<a href="{href}" class="{"active" if active == href else ""}">{name}</a>'
         for href, name in pages
@@ -328,6 +472,19 @@ def _page_setup(alert: str = "", alert_type: str = "success") -> str:
         return "••••••••" if env.get(key) else ""
 
     alert_html = f'<div class="alert alert-{alert_type}">{alert}</div>' if alert else ""
+
+    current_days = set(d.strip().lower() for d in env.get("POST_DAYS", "mon,wed,fri").split(","))
+    days_html = " ".join(
+        f'<label class="day-cb"><input type="checkbox" name="POST_DAYS" value="{d}" '
+        f'{"checked" if d in current_days else ""}>{label}</label>'
+        for d, label in [
+            ("mon", "Mon"), ("tue", "Tue"), ("wed", "Wed"), ("thu", "Thu"),
+            ("fri", "Fri"), ("sat", "Sat"), ("sun", "Sun"),
+        ]
+    )
+    post_hour_val = int(env.get("POST_HOUR", "9"))
+    post_minute_val = int(env.get("POST_MINUTE", "0"))
+    post_time_val = f"{post_hour_val:02d}:{post_minute_val:02d}"
 
     return _head("Setup") + _nav("/setup") + f"""
 <div class="container">
@@ -435,31 +592,41 @@ def _page_setup(alert: str = "", alert_type: str = "success") -> str:
     </div>
 
     <div class="card">
-      <div class="card-title">Email Notifications (Gmail SMTP)</div>
+      <div class="card-title">Email Notifications</div>
       <div class="grid-2">
         <div class="field">
-          <label>Gmail Address</label>
+          <label>SMTP Host <span class="hint">your mail server</span></label>
+          <input type="text" name="SMTP_HOST" value="{val("SMTP_HOST", "smtp.gmail.com")}"
+                 placeholder="smtp.gmail.com · smtp.office365.com · mail.yourdomain.com">
+        </div>
+        <div class="field">
+          <label>SMTP Port <span class="hint">usually 587 (TLS) or 465 (SSL)</span></label>
+          <input type="number" name="SMTP_PORT" value="{val("SMTP_PORT", "587")}">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label>Email Address</label>
           <input type="text" name="SMTP_USER" value="{val("SMTP_USER")}">
         </div>
         <div class="field">
-          <label>App Password <span class="hint">leave blank to keep current</span></label>
-          <input type="password" name="SMTP_PASSWORD" placeholder="{masked("SMTP_PASSWORD") or "xxxx xxxx xxxx xxxx"}">
+          <label>Password / App Password <span class="hint">leave blank to keep current</span></label>
+          <input type="password" name="SMTP_PASSWORD" placeholder="{masked("SMTP_PASSWORD") or "your email password"}">
         </div>
       </div>
     </div>
 
     <div class="card">
       <div class="card-title">Posting Schedule</div>
-      <div class="grid-2">
-        <div class="field">
-          <label>Post Days</label>
-          <input type="text" name="POST_DAYS" value="{val("POST_DAYS", "mon,wed,fri")}"
-                 placeholder="mon,wed,fri">
+      <div class="field">
+        <label>Post Days <span class="hint">select one or more days</span></label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+          {days_html}
         </div>
-        <div class="field">
-          <label>Post Hour (UTC, 0–23)</label>
-          <input type="number" name="POST_HOUR" value="{val("POST_HOUR", "9")}" min="0" max="23">
-        </div>
+      </div>
+      <div class="field" style="margin-top:16px">
+        <label>Post Time <span class="hint">format: HH:MM (UTC, 24-hour clock)</span></label>
+        <input type="time" name="POST_TIME" value="{post_time_val}" style="max-width:180px">
       </div>
     </div>
 
@@ -578,6 +745,90 @@ def _page_influence(alert: str = "") -> str:
 </div></body></html>"""
 
 
+def _page_calendar() -> str:
+    from datetime import datetime
+    from config import config
+
+    now = datetime.utcnow()
+    all_entries = _build_calendar_data()
+
+    future = [e for e in all_entries if e["dt"] >= now]
+    past = list(reversed([e for e in all_entries if e["dt"] < now]))
+
+    def _render_group(entry_list: list) -> str:
+        if not entry_list:
+            return '<p class="empty">Nothing here yet</p>'
+
+        html = ""
+        current_date_str = None
+
+        for e in entry_list:
+            dt = e["dt"]
+            date_str = dt.strftime(f"%A, %B {dt.day}, %Y")
+            time_str = dt.strftime("%H:%M UTC")
+
+            if date_str != current_date_str:
+                if current_date_str is not None:
+                    html += "</div>"  # close previous day group
+                html += f'<div class="cal-day-group"><div class="cal-date">{date_str}</div>'
+                current_date_str = date_str
+
+            status = e["status"]
+            if status == "posted":
+                badge = '<span class="badge badge-ok">Posted</span>'
+                li = ' &nbsp;<span style="font-size:11px;color:#1e8449">LI ✓</span>' if e.get("li_ok") else ' &nbsp;<span style="font-size:11px;color:#c0392b">LI ✗</span>'
+                fb = ' &nbsp;<span style="font-size:11px;color:#1e8449">FB ✓</span>' if e.get("fb_ok") else ' &nbsp;<span style="font-size:11px;color:#c0392b">FB ✗</span>'
+                extra = li + fb
+            elif status == "pending":
+                badge = '<span class="badge badge-pending">Pending Approval</span>'
+                token = e.get("token", "")
+                host, port = config.vps_host, config.approval_port
+                extra = f' &nbsp;<a href="http://{host}:{port}/review?token={token}" style="color:#2ecc71;font-weight:600;font-size:12px">Review →</a>'
+            elif status == "approved":
+                badge = '<span class="badge badge-ok">Approved</span>'
+                extra = ""
+            elif status == "rejected":
+                badge = '<span class="badge badge-fail">Rejected</span>'
+                extra = ""
+            else:  # planned
+                badge = '<span class="badge badge-none">Planned</span>'
+                extra = ""
+
+            industry = f' &nbsp;·&nbsp; <span style="color:#888">{_esc(e["industry"])}</span>' if e.get("industry") else ""
+            preview_html = f'<div class="cal-preview">{_esc(e["preview"][:120])}{"..." if len(e.get("preview","")) > 120 else ""}</div>' if e.get("preview") else ""
+
+            html += f"""<div class="cal-entry">
+  <div class="cal-time">{time_str}</div>
+  <div class="cal-info">
+    <div>{badge} &nbsp;<strong>{_esc(e["theme_name"])}</strong>{industry}{extra}</div>
+    {preview_html}
+  </div>
+</div>"""
+
+        if current_date_str is not None:
+            html += "</div>"  # close last day group
+        return html
+
+    future_html = _render_group(future)
+    past_html = _render_group(past)
+
+    return _head("Calendar") + _nav("/calendar") + f"""
+<div class="container">
+  <h1>Calendar</h1>
+  <p class="subtitle">All scheduled, pending, and past posts — times shown in UTC.</p>
+
+  <div class="card">
+    <div class="card-title">Upcoming Posts</div>
+    {future_html}
+  </div>
+
+  <div class="card">
+    <div class="card-title">Past Posts</div>
+    {past_html}
+  </div>
+</div></body></html>"""
+
+
 # ---------------------------------------------------------------------------
 # HTTP Handler
 # ---------------------------------------------------------------------------
@@ -596,8 +847,8 @@ _SETUP_KEYS = {
     "LINKEDIN_ACCESS_TOKEN", "LINKEDIN_PERSON_URN", "LINKEDIN_ORG_URN",
     "FACEBOOK_ACCESS_TOKEN", "FACEBOOK_PAGE_ID",
     "BUSINESS_NAME", "BUSINESS_WEBSITE", "CONTACT_EMAIL",
-    "SMTP_USER", "SMTP_PASSWORD",
-    "POST_DAYS", "POST_HOUR",
+    "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD",
+    "POST_DAYS", "POST_HOUR", "POST_MINUTE",
     "APPROVAL_REQUIRED", "VPS_HOST", "APPROVAL_PORT",
 }
 
@@ -615,6 +866,8 @@ class _Handler(BaseHTTPRequestHandler):
             self._send(200, _page_setup())
         elif p.path == "/influence":
             self._send(200, _page_influence())
+        elif p.path == "/calendar":
+            self._send(200, _page_calendar())
         elif p.path == "/review":
             self._review(token)
         elif p.path == "/reject":
@@ -647,16 +900,31 @@ class _Handler(BaseHTTPRequestHandler):
     def _save_setup(self, body: dict):
         env = _read_env()
         updates = {}
+
+        # POST_DAYS: multiple checkboxes return a list
+        post_days_list = body.get("POST_DAYS", [])
+        updates["POST_DAYS"] = ",".join(post_days_list) if post_days_list else env.get("POST_DAYS", "mon,wed,fri")
+
+        # POST_TIME → split into POST_HOUR + POST_MINUTE
+        skip_keys = {"POST_DAYS", "POST_HOUR", "POST_MINUTE"}
+        post_time = body.get("POST_TIME", [""])[0].strip()
+        if post_time and ":" in post_time:
+            try:
+                h, m = post_time.split(":", 1)
+                updates["POST_HOUR"] = str(int(h))
+                updates["POST_MINUTE"] = str(int(m))
+            except ValueError:
+                pass
+
         for key in _SETUP_KEYS:
+            if key in skip_keys:
+                continue
             form_val = body.get(key, [""])[0].strip()
             if form_val:
-                # Non-empty submission — update
                 updates[key] = form_val
             elif key in _SENSITIVE_KEYS:
-                # Blank sensitive field = keep existing (don't touch)
-                pass
+                pass  # keep existing
             else:
-                # Non-sensitive blank = update to blank (allow clearing)
                 updates[key] = form_val
 
         _write_env(updates)
