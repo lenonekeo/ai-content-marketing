@@ -556,6 +556,20 @@ def _page_influence(alert: str = "") -> str:
       </div>
     </div>
 
+    <div class="card">
+      <div class="card-title">Inspiration Sources</div>
+      <div class="field">
+        <label>Social media &amp; website URLs <span class="hint">one per line — content is fetched and cached for 24h</span></label>
+        <textarea name="inspiration_urls" style="min-height:160px"
+                  placeholder="https://www.facebook.com/yourbrandpage&#10;https://www.linkedin.com/company/yourbrand&#10;https://www.youtube.com/@yourchannel&#10;https://yourblog.com/articles&#10;&#10;The AI will read these pages and draw content ideas from them. Max 5 URLs used per generation.">{val("inspiration_urls")}</textarea>
+      </div>
+      <p style="font-size:12px;color:#aaa;margin-top:-8px">
+        Supported: any public webpage, Facebook page, LinkedIn company page, YouTube channel,
+        Instagram profile (public), blog, news site, competitor site, etc.
+        Paywalled or login-required pages will be skipped automatically.
+      </p>
+    </div>
+
     <div class="section-actions">
       <button type="submit" class="btn btn-primary">Save Influence Settings</button>
       <a href="/" class="btn btn-ghost">Cancel</a>
@@ -658,6 +672,7 @@ class _Handler(BaseHTTPRequestHandler):
             "style_notes": body.get("style_notes", [""])[0],
             "example_posts": body.get("example_posts", [""])[0],
             "avoid": body.get("avoid", [""])[0],
+            "inspiration_urls": body.get("inspiration_urls", [""])[0],
         }
         save_influence(data)
         logger.info("Influence settings saved")
