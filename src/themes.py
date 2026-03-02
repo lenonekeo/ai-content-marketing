@@ -12,7 +12,7 @@ THEMES = [
             "- Start with a hook that highlights a common business pain point\n"
             "- Explain how AI automation solves this specific problem\n"
             "- Include 1-2 concrete benefits with metrics if possible\n"
-            "- End with a soft call-to-action\n"
+            "- End with this exact call-to-action: 'Book a free discovery call so you could assess how to win with AI automation https://makone-bi.com'\n"
             "- Professional but conversational tone, 150-200 words\n"
             "- Include 3-5 relevant hashtags at the end\n"
             "- Do not use emojis. Write naturally and professionally."
@@ -37,7 +37,7 @@ THEMES = [
             "- Share one actionable tip for improving business processes with AI\n"
             "- Make it practical and immediately applicable with a brief scenario\n"
             "- Professional, helpful tone, 100-150 words\n"
-            "- Call-to-action: Offer more tips or consultation\n"
+            "- End with this exact call-to-action: 'Book a free discovery call so you could assess how to win with AI automation https://makone-bi.com'\n"
             "- Include 3-5 relevant hashtags\n"
             "- Do not use emojis. Write naturally and professionally."
         ),
@@ -61,7 +61,7 @@ THEMES = [
             "- Share specific results (time saved, cost reduced, efficiency gained)\n"
             "- Keep client details general/anonymized\n"
             "- Inspiring but credible tone, 150-200 words\n"
-            "- CTA: 'Ready for similar results?'\n"
+            "- End with this exact call-to-action: 'Book a free discovery call so you could assess how to win with AI automation https://makone-bi.com'\n"
             "- Include 3-5 hashtags\n"
             "- Do not use emojis. Write naturally and professionally."
         ),
@@ -86,7 +86,7 @@ THEMES = [
             "- Explain why it matters for businesses\n"
             "- Connect to practical business applications\n"
             "- Thought leadership tone, 150-200 words\n"
-            "- CTA: Stay ahead of the curve\n"
+            "- End with this exact call-to-action: 'Book a free discovery call so you could assess how to win with AI automation https://makone-bi.com'\n"
             "- Include 3-5 hashtags\n"
             "- Do not use emojis. Write naturally and professionally."
         ),
@@ -110,7 +110,7 @@ THEMES = [
             "- Use specific, relatable examples\n"
             "- Emphasize time/cost savings\n"
             "- Conversational tone, 150-200 words\n"
-            "- CTA: 'Let us automate your process'\n"
+            "- End with this exact call-to-action: 'Book a free discovery call so you could assess how to win with AI automation https://makone-bi.com'\n"
             "- Include 3-5 hashtags\n"
             "- Do not use emojis. Write naturally and professionally."
         ),
@@ -133,7 +133,7 @@ THEMES = [
             "- Use analogies or examples for clarity\n"
             "- Show how businesses can apply it\n"
             "- Helpful, teacher-like tone, 150-200 words\n"
-            "- CTA: Learn more or ask questions\n"
+            "- End with this exact call-to-action: 'Book a free discovery call so you could assess how to win with AI automation https://makone-bi.com'\n"
             "- Include 3-5 hashtags\n"
             "- Do not use emojis. Write naturally and professionally."
         ),
@@ -159,7 +159,7 @@ THEMES = [
             "- Include what makes your approach unique\n"
             "- Avoid being too sales-y\n"
             "- Professional, confident tone, 150-200 words\n"
-            "- CTA: Book a consultation or learn more\n"
+            "- End with this exact call-to-action: 'Book a free discovery call so you could assess how to win with AI automation https://makone-bi.com'\n"
             "- Include 3-5 hashtags\n"
             "- Do not use emojis. Write naturally and professionally."
         ),
