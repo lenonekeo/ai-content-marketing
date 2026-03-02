@@ -1,16 +1,19 @@
 import logging
 from openai import OpenAI
 from config import config
+from src.influence import get_prompt_context
 
 logger = logging.getLogger(__name__)
 _client = OpenAI(api_key=config.openai_api_key)
 
 
 def generate_post(prompt: str) -> str:
+    influence = get_prompt_context()
+    full_prompt = prompt + influence
     logger.info("Generating post content with OpenAI...")
     response = _client.chat.completions.create(
         model=config.openai_model,
-        messages=[{"role": "user", "content": prompt}],
+        messages=[{"role": "user", "content": full_prompt}],
         temperature=config.openai_temperature,
         max_tokens=config.openai_max_tokens,
     )
