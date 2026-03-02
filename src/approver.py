@@ -856,42 +856,64 @@ _SETUP_KEYS = {
 class _Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
-        p = urlparse(self.path)
-        qs = parse_qs(p.query)
-        token = qs.get("token", [None])[0]
+        try:
+            p = urlparse(self.path)
+            qs = parse_qs(p.query)
+            token = qs.get("token", [None])[0]
 
-        if p.path in ("/", ""):
-            self._send(200, _page_dashboard())
-        elif p.path == "/setup":
-            self._send(200, _page_setup())
-        elif p.path == "/influence":
-            self._send(200, _page_influence())
-        elif p.path == "/calendar":
-            self._send(200, _page_calendar())
-        elif p.path == "/review":
-            self._review(token)
-        elif p.path == "/reject":
-            self._reject(token)
-        else:
-            self._send(404, self._simple_page("Not found", "Page not found.", "#e74c3c"))
+            if p.path in ("/", ""):
+                self._send(200, _page_dashboard())
+            elif p.path == "/setup":
+                self._send(200, _page_setup())
+            elif p.path == "/influence":
+                self._send(200, _page_influence())
+            elif p.path == "/calendar":
+                self._send(200, _page_calendar())
+            elif p.path == "/review":
+                self._review(token)
+            elif p.path == "/reject":
+                self._reject(token)
+            else:
+                self._send(404, self._simple_page("Not found", "Page not found.", "#e74c3c"))
+        except Exception as exc:
+            logger.exception(f"Unhandled error in GET {self.path}")
+            try:
+                self._send(500, self._simple_page(
+                    "Server Error",
+                    f"Error: {_esc(str(exc))}",
+                    "#e74c3c",
+                ))
+            except Exception:
+                pass
 
     def do_POST(self):
-        p = urlparse(self.path)
-        qs = parse_qs(p.query)
-        token = qs.get("token", [None])[0]
-        n = int(self.headers.get("Content-Length", 0))
-        body = parse_qs(self.rfile.read(n).decode("utf-8", errors="replace"))
+        try:
+            p = urlparse(self.path)
+            qs = parse_qs(p.query)
+            token = qs.get("token", [None])[0]
+            n = int(self.headers.get("Content-Length", 0))
+            body = parse_qs(self.rfile.read(n).decode("utf-8", errors="replace"))
 
-        if p.path == "/setup":
-            self._save_setup(body)
-        elif p.path == "/influence":
-            self._save_influence(body)
-        elif p.path == "/publish":
-            li = body.get("linkedin_text", [""])[0]
-            fb = body.get("facebook_text", [""])[0]
-            self._publish(token, li, fb)
-        else:
-            self._send(404, self._simple_page("Not found", "Page not found.", "#e74c3c"))
+            if p.path == "/setup":
+                self._save_setup(body)
+            elif p.path == "/influence":
+                self._save_influence(body)
+            elif p.path == "/publish":
+                li = body.get("linkedin_text", [""])[0]
+                fb = body.get("facebook_text", [""])[0]
+                self._publish(token, li, fb)
+            else:
+                self._send(404, self._simple_page("Not found", "Page not found.", "#e74c3c"))
+        except Exception as exc:
+            logger.exception(f"Unhandled error in POST {self.path}")
+            try:
+                self._send(500, self._simple_page(
+                    "Server Error",
+                    f"Error: {_esc(str(exc))}",
+                    "#e74c3c",
+                ))
+            except Exception:
+                pass
 
     # ------------------------------------------------------------------
     # Admin handlers
