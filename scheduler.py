@@ -7,11 +7,16 @@ logger = logging.getLogger(__name__)
 
 
 def start_scheduler():
-    from main import run_job
+    if config.approval_required:
+        from main import generate_draft as job_fn
+        logger.info("Approval required — scheduler will generate drafts and send approval emails")
+    else:
+        from main import run_job as job_fn
+        logger.info("No approval required — scheduler will post directly")
 
     scheduler = BlockingScheduler(timezone="UTC")
     scheduler.add_job(
-        run_job,
+        job_fn,
         trigger=CronTrigger(
             day_of_week=config.post_days,
             hour=config.post_hour,

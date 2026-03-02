@@ -65,6 +65,11 @@ class Config:
     post_hour: int = int(_optional("POST_HOUR", "9"))
     post_days: str = _optional("POST_DAYS", "mon,wed,fri")
 
+    # Approval workflow
+    approval_required: bool = _optional("APPROVAL_REQUIRED", "true").lower() in ("true", "1", "yes")
+    approval_port: int = int(_optional("APPROVAL_PORT", "8080"))
+    vps_host: str = _optional("VPS_HOST", "localhost")
+
     # Paths
     downloads_dir: str = "downloads"
     logs_file: str = "logs/posts.jsonl"
