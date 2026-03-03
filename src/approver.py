@@ -939,8 +939,50 @@ def _page_calendar() -> str:
 
 def _page_create(alert: str = "", alert_type: str = "success") -> str:
     from config import config as _cfg
+    from src.influence import load as _load_influence
+    inf = _load_influence()
+    tz_name = _cfg.timezone or "UTC"
     default_role = f"You are an expert content marketer and copywriter for {_cfg.business_name}. Your goal is to write engaging, professional social media content that drives business results."
     alert_html = f'<div class="alert alert-{alert_type}">{alert}</div>' if alert else ""
+
+    # Build influence summary badge
+    inf_parts = []
+    if inf.get("topics"):
+        inf_parts.append(f"Topics: {inf['topics'][:60]}")
+    if inf.get("target_audience"):
+        inf_parts.append(f"Audience: {inf['target_audience'][:50]}")
+    if inf.get("brand_voice"):
+        inf_parts.append(f"Tone: {inf['brand_voice'][:40]}")
+    url_count = len([u for u in inf.get("inspiration_urls", "").splitlines() if u.strip()])
+    if url_count:
+        inf_parts.append(f"{url_count} inspiration URL{'s' if url_count > 1 else ''}")
+    if inf_parts:
+        inf_summary_html = (
+            f'<div style="background:#1a2e1a;border:1px solid #2ecc71;border-radius:6px;padding:10px 14px;margin-top:12px;font-size:12px">'
+            f'<span style="color:#2ecc71;font-weight:600">✓ Content Influence active</span>'
+            f'<span style="color:#aaa;margin-left:8px">{_esc(" · ".join(inf_parts))}</span>'
+            f'<a href="/influence" style="color:#2ecc71;margin-left:12px">Edit →</a>'
+            f'</div>'
+        )
+    else:
+        inf_summary_html = (
+            f'<div style="background:#2e1a0a;border:1px solid #e67e22;border-radius:6px;padding:10px 14px;margin-top:12px;font-size:12px">'
+            f'<span style="color:#e67e22">⚠ No Content Influence settings — the AI will use generic context.</span>'
+            f'<a href="/influence" style="color:#e67e22;margin-left:10px">Set up →</a>'
+            f'</div>'
+        )
+
+    # Video buttons (enabled only if credentials set)
+    veo3_btn = (
+        '<button class="btn btn-ghost" onclick="generateVideo(\'veo3\')" id="veo3-btn">Generate Video (VEO 3)</button>'
+        if _cfg.veo3_enabled else
+        '<button class="btn btn-ghost" disabled title="Configure GOOGLE_API_KEY in Setup">VEO 3 (not configured)</button>'
+    )
+    heygen_btn = (
+        '<button class="btn btn-ghost" onclick="generateVideo(\'heygen\')" id="heygen-btn">AI Clone (HeyGen)</button>'
+        if _cfg.heygen_enabled else
+        '<button class="btn btn-ghost" disabled title="Configure HEYGEN_API_KEY in Setup">HeyGen (not configured)</button>'
+    )
 
     return _head("Create Content") + _nav("/create") + f"""
 <div class="container">
@@ -975,10 +1017,7 @@ def _page_create(alert: str = "", alert_type: str = "success") -> str:
         </div>
       </div>
     </div>
-    <p style="font-size:12px;color:#aaa;margin-top:10px">
-      Content Influence settings (topics, brand voice, audience, inspiration URLs) are applied automatically.
-      <a href="/influence" style="color:#2ecc71">Manage →</a>
-    </p>
+    {inf_summary_html}
   </div>
 
   <div class="card">
@@ -1032,10 +1071,16 @@ def _page_create(alert: str = "", alert_type: str = "success") -> str:
           <input type="text" id="video_url" placeholder="https://...">
         </div>
       </div>
-      <div style="margin-top:12px;display:flex;gap:10px;align-items:center">
+      <div style="margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
         <button class="btn btn-ghost" onclick="generateAIImage()">Generate AI Image</button>
         <span id="img-spinner" style="display:none"><span class="spinner" style="width:20px;height:20px;border-width:2px"></span></span>
         <span id="img-status" style="font-size:13px;color:#888"></span>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        {veo3_btn}
+        {heygen_btn}
+        <span id="vid-spinner" style="display:none"><span class="spinner" style="width:20px;height:20px;border-width:2px"></span></span>
+        <span id="vid-status" style="font-size:13px;color:#888"></span>
       </div>
     </div>
 
@@ -1053,7 +1098,7 @@ def _page_create(alert: str = "", alert_type: str = "success") -> str:
           </label>
         </div>
         <div id="sched-picker" style="display:none">
-          <label>Date &amp; Time <span class="hint">UTC — post will publish automatically at this time</span></label>
+          <label>Date &amp; Time <span class="hint">{tz_name} — post will publish automatically at this time</span></label>
           <input type="datetime-local" id="scheduled_at" style="max-width:280px">
         </div>
       </div>
@@ -1237,6 +1282,59 @@ function toggleSchedule() {{
   document.getElementById("sched-picker").style.display = later ? "block" : "none";
 }}
 
+async function generateVideo(type) {{
+  const lastMsg = messages.length > 0 ? messages[messages.length-1].content : "";
+  const chatInput = document.getElementById("chat-input").value.trim();
+  const script = lastMsg || chatInput || "AI automation and business intelligence services";
+  const spinner = document.getElementById("vid-spinner");
+  const status = document.getElementById("vid-status");
+  const veo3Btn = document.getElementById("veo3-btn");
+  const heygenBtn = document.getElementById("heygen-btn");
+
+  spinner.style.display = "inline-flex";
+  status.textContent = type === "veo3" ? "Submitting to VEO 3 (takes ~2 min)..." : "Submitting to HeyGen (takes 2-5 min)...";
+  if (veo3Btn) veo3Btn.disabled = true;
+  if (heygenBtn) heygenBtn.disabled = true;
+
+  try {{
+    const resp = await fetch("/create/video/" + type, {{
+      method: "POST",
+      headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
+      body: (type === "veo3" ? "prompt=" : "script=") + encodeURIComponent(script)
+    }});
+    const data = await resp.json();
+    if (data.error) {{ status.textContent = "Error: " + data.error; return; }}
+    const jobId = data.job_id;
+    // Poll for completion
+    const poll = setInterval(async () => {{
+      try {{
+        const sr = await fetch("/create/video/status?job_id=" + encodeURIComponent(jobId));
+        const sd = await sr.json();
+        if (sd.status === "done") {{
+          clearInterval(poll);
+          spinner.style.display = "none";
+          document.getElementById("video_url").value = sd.url;
+          status.textContent = "Video ready!";
+          // Show draft section if not visible
+          document.getElementById("draft-section").style.display = "block";
+        }} else if (sd.status === "error") {{
+          clearInterval(poll);
+          spinner.style.display = "none";
+          status.textContent = "Error: " + (sd.error || "Generation failed");
+        }} else {{
+          status.textContent = (type === "veo3" ? "Generating VEO 3 video" : "Generating HeyGen avatar") + "...";
+        }}
+      }} catch(e) {{ /* ignore poll errors */ }}
+    }}, 8000);
+  }} catch(e) {{
+    status.textContent = "Request failed: " + e.message;
+  }} finally {{
+    spinner.style.display = "none";
+    if (veo3Btn) veo3Btn.disabled = false;
+    if (heygenBtn) heygenBtn.disabled = false;
+  }}
+}}
+
 function clearChat() {{
   messages = [];
   const win = document.getElementById("chat-window");
@@ -1267,6 +1365,37 @@ function showError(msg) {{
 # ---------------------------------------------------------------------------
 
 _publish_callback = None  # set by start_approval_server
+
+# Background video generation jobs: job_id -> {"status": "pending"|"done"|"error", "url": "", "error": ""}
+_video_jobs: dict = {}
+
+
+def _start_video_job(job_id: str, video_type: str, text: str):
+    """Run video generation in a background thread."""
+    import threading
+    import datetime as _dtmod
+
+    def _run():
+        try:
+            ts = _dtmod.datetime.now().strftime("%Y%m%d_%H%M%S")
+            if video_type == "veo3":
+                from src import veo3_client
+                from config import config as _cfg
+                fname = f"veo3_{ts}.mp4"
+                veo3_client.make_video(text, fname)
+                url = _cfg.get_public_url(f"/media/{fname}")
+            else:  # heygen
+                from src import heygen_client
+                video_url = heygen_client.wait_for_video(heygen_client.create_video(text))
+                url = video_url  # HeyGen returns a public CDN URL directly
+            _video_jobs[job_id] = {"status": "done", "url": url}
+            logger.info(f"Video job {job_id} ({video_type}) completed: {url}")
+        except Exception as e:
+            _video_jobs[job_id] = {"status": "error", "error": str(e)}
+            logger.error(f"Video job {job_id} ({video_type}) failed: {e}")
+
+    _video_jobs[job_id] = {"status": "pending"}
+    threading.Thread(target=_run, daemon=True).start()
 
 _SENSITIVE_KEYS = {
     "OPENAI_API_KEY", "HEYGEN_API_KEY", "GOOGLE_API_KEY",
@@ -1306,6 +1435,10 @@ class _Handler(BaseHTTPRequestHandler):
                 self._send(200, _page_calendar())
             elif p.path == "/create":
                 self._send(200, _page_create())
+            elif p.path == "/create/video/status":
+                job_id = qs.get("job_id", [None])[0]
+                job = _video_jobs.get(job_id, {"status": "error", "error": "Unknown job"})
+                self._send_json(job)
             elif p.path.startswith("/media/"):
                 self._serve_media(p.path[7:])
             elif p.path == "/review":
@@ -1343,6 +1476,8 @@ class _Handler(BaseHTTPRequestHandler):
                 self._save_content_draft(body)
             elif p.path == "/create/image":
                 self._generate_ai_image(body)
+            elif p.path in ("/create/video/veo3", "/create/video/heygen"):
+                self._start_video_generation(body, p.path)
             elif p.path == "/publish":
                 li = body.get("linkedin_text", [""])[0]
                 fb = body.get("facebook_text", [""])[0]
@@ -1396,7 +1531,25 @@ class _Handler(BaseHTTPRequestHandler):
 
         _write_env(updates)
         logger.info(f"Settings updated: {[k for k in updates if k not in _SENSITIVE_KEYS]}")
-        self._send(200, _page_setup(alert="Settings saved successfully. Restart the service for changes to take effect.", alert_type="success"))
+
+        # Live-reschedule if any schedule setting changed — no restart needed
+        schedule_keys = {"POST_DAYS", "POST_HOUR", "POST_MINUTE", "TIMEZONE"}
+        if schedule_keys & set(updates):
+            try:
+                from scheduler import reschedule_job
+                days = updates.get("POST_DAYS", "mon,wed,fri")
+                hour = int(updates.get("POST_HOUR", "9"))
+                minute = int(updates.get("POST_MINUTE", "0"))
+                tz = updates.get("TIMEZONE", "UTC")
+                reschedule_job(days, hour, minute, tz)
+                alert_msg = "Settings saved. Schedule updated live — no restart needed."
+            except Exception as e:
+                logger.error(f"Live reschedule failed: {e}")
+                alert_msg = "Settings saved. Restart the service to apply the new schedule."
+        else:
+            alert_msg = "Settings saved successfully. Restart the service for changes to take effect."
+
+        self._send(200, _page_setup(alert=alert_msg, alert_type="success"))
 
     def _save_influence(self, body: dict):
         from src.influence import save as save_influence
@@ -1472,6 +1625,18 @@ class _Handler(BaseHTTPRequestHandler):
             "content_preview": (li or fb or ig)[:300],
         }
         if scheduled_at:
+            # Convert from user's configured timezone to UTC for comparison
+            try:
+                from zoneinfo import ZoneInfo
+                import datetime as _dtmod
+                from config import config as _cfg
+                tz_name = _cfg.timezone or "UTC"
+                naive_dt = _dtmod.datetime.fromisoformat(scheduled_at)
+                aware_dt = naive_dt.replace(tzinfo=ZoneInfo(tz_name))
+                utc_dt = aware_dt.astimezone(_dtmod.timezone.utc)
+                scheduled_at = utc_dt.strftime("%Y-%m-%dT%H:%M:%S")
+            except Exception as _e:
+                logger.warning(f"Timezone conversion for scheduled_at failed: {_e}")
             draft_data["scheduled_at"] = scheduled_at
         if image_url:
             draft_data["image_url"] = image_url
@@ -1535,6 +1700,17 @@ class _Handler(BaseHTTPRequestHandler):
         except Exception as e:
             logger.exception("AI image generation failed")
             self._send_json({"error": str(e)})
+
+    def _start_video_generation(self, body: dict, path: str):
+        """Start a background video generation job and return a job_id for polling."""
+        import secrets as _sec
+        video_type = "veo3" if path.endswith("veo3") else "heygen"
+        text = body.get("prompt" if video_type == "veo3" else "script", [""])[0].strip()
+        if not text:
+            text = "AI automation and business intelligence services"
+        job_id = _sec.token_urlsafe(12)
+        _start_video_job(job_id, video_type, text)
+        self._send_json({"job_id": job_id})
 
     # ------------------------------------------------------------------
     # Draft review handlers
