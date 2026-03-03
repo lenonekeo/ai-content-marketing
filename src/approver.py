@@ -1177,22 +1177,30 @@ async function sendMessage() {{
   }}
 }}
 
+let _draftTexts = [];
+
 function appendMsg(role, text, showUseThis=false) {{
   const win = document.getElementById("chat-window");
   const div = document.createElement("div");
   div.className = "chat-msg " + role;
   const escaped = text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-  let extra = "";
-  if (showUseThis) {{
-    extra = `<br><button class="use-this-btn" onclick="useThis(${{JSON.stringify(text)}})">Use this ↓</button>`;
-  }}
   div.innerHTML = `<div class="chat-avatar">${{role === "user" ? "You" : "AI"}}</div>
-    <div><div class="chat-bubble">${{escaped}}</div>${{extra}}</div>`;
+    <div><div class="chat-bubble">${{escaped}}</div></div>`;
+  if (showUseThis) {{
+    const idx = _draftTexts.length;
+    _draftTexts.push(text);
+    const btn = document.createElement("button");
+    btn.className = "use-this-btn";
+    btn.textContent = "Use this \u2193";
+    btn.onclick = function() {{ useThis(idx); }};
+    div.querySelector("div > div:last-child").after(btn);
+  }}
   win.appendChild(div);
   win.scrollTop = win.scrollHeight;
 }}
 
-function useThis(text) {{
+function useThis(idx) {{
+  const text = _draftTexts[idx] !== undefined ? _draftTexts[idx] : "";
   const platforms = getSelectedPlatforms();
   // Show draft section with platform fields
   document.getElementById("li-field").style.display = platforms.includes("linkedin") ? "" : "none";
@@ -1337,6 +1345,7 @@ async function generateVideo(type) {{
 
 function clearChat() {{
   messages = [];
+  _draftTexts = [];
   const win = document.getElementById("chat-window");
   win.innerHTML = `<div class="chat-msg ai">
     <div class="chat-avatar">AI</div>
