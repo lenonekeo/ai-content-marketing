@@ -70,11 +70,19 @@ class Config:
     post_hour: int = int(_optional("POST_HOUR", "9"))
     post_minute: int = int(_optional("POST_MINUTE", "0"))
     post_days: str = _optional("POST_DAYS", "mon,wed,fri")
+    timezone: str = _optional("TIMEZONE", "UTC")
 
     # Approval workflow
     approval_required: bool = _optional("APPROVAL_REQUIRED", "true").lower() in ("true", "1", "yes")
     approval_port: int = int(_optional("APPROVAL_PORT", "8080"))
     vps_host: str = _optional("VPS_HOST", "localhost")
+    public_base_url: str = _optional("PUBLIC_BASE_URL", "")  # e.g. http://5.161.123.45 (no trailing slash)
+
+    def get_public_url(self, path: str = "") -> str:
+        """Return a public-facing URL. Uses PUBLIC_BASE_URL if set, else host:port."""
+        if self.public_base_url:
+            return f"{self.public_base_url.rstrip('/')}{path}"
+        return f"http://{self.vps_host}:{self.approval_port}{path}"
 
     # Paths
     downloads_dir: str = "downloads"

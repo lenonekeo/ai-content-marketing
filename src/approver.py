@@ -457,17 +457,13 @@ def _page_dashboard(alert: str = "") -> str:
             theme = d.get("theme", "?").replace("_", " ").title()
             industry = d.get("industry", "?")
             token = d.get("token", "")
-            from config import config
-            host = config.vps_host
-            port = config.approval_port
-            url = f"http://{host}:{port}/review?token={token}"
             drafts_html += f"""
 <div class="draft-row">
   <div>
     <strong>{theme}</strong> &nbsp;<span class="badge badge-pending">Pending</span>
     <div class="draft-meta">{industry} &nbsp;·&nbsp; {ts}</div>
   </div>
-  <a href="{url}" class="btn btn-primary">Review &amp; Approve</a>
+  <a href="/review?token={token}" class="btn btn-primary">Review &amp; Approve</a>
 </div>"""
     else:
         drafts_html = '<p class="empty">No pending drafts</p>'
@@ -704,9 +700,32 @@ def _page_setup(alert: str = "", alert_type: str = "success") -> str:
           {days_html}
         </div>
       </div>
-      <div class="field" style="margin-top:16px">
-        <label>Post Time <span class="hint">format: HH:MM (UTC, 24-hour clock)</span></label>
-        <input type="time" name="POST_TIME" value="{post_time_val}" style="max-width:180px">
+      <div class="grid-2" style="margin-top:16px">
+        <div class="field">
+          <label>Post Time <span class="hint">24-hour clock</span></label>
+          <input type="time" name="POST_TIME" value="{post_time_val}" style="max-width:180px">
+        </div>
+        <div class="field">
+          <label>Timezone</label>
+          <select name="TIMEZONE">
+            {"".join(f'<option value="{tz}" {"selected" if env.get("TIMEZONE","UTC")==tz else ""}>{label}</option>' for tz, label in [
+              ("UTC","UTC"),
+              ("America/New_York","EST/EDT — New York, Toronto, Montreal"),
+              ("America/Chicago","CST/CDT — Chicago, Dallas"),
+              ("America/Denver","MST/MDT — Denver, Phoenix"),
+              ("America/Los_Angeles","PST/PDT — Los Angeles, Vancouver"),
+              ("America/Sao_Paulo","BRT — São Paulo, Brazil"),
+              ("Europe/London","GMT/BST — London"),
+              ("Europe/Paris","CET/CEST — Paris, Brussels"),
+              ("Europe/Berlin","CET/CEST — Berlin, Amsterdam"),
+              ("Asia/Dubai","GST — Dubai"),
+              ("Asia/Kolkata","IST — India"),
+              ("Asia/Singapore","SGT — Singapore"),
+              ("Asia/Tokyo","JST — Tokyo"),
+              ("Australia/Sydney","AEDT — Sydney"),
+            ])}
+          </select>
+        </div>
       </div>
     </div>
 
@@ -862,8 +881,7 @@ def _page_calendar() -> str:
             elif status == "pending":
                 badge = '<span class="badge badge-pending">Pending Approval</span>'
                 token = e.get("token", "")
-                host, port = config.vps_host, config.approval_port
-                extra = f' &nbsp;<a href="http://{host}:{port}/review?token={token}" style="color:#2ecc71;font-weight:600;font-size:12px">Review →</a>'
+                extra = f' &nbsp;<a href="/review?token={token}" style="color:#2ecc71;font-weight:600;font-size:12px">Review →</a>'
             elif status == "approved":
                 badge = '<span class="badge badge-ok">Approved</span>'
                 extra = ""
@@ -1265,7 +1283,7 @@ _SETUP_KEYS = {
     "INSTAGRAM_ACCESS_TOKEN", "INSTAGRAM_ACCOUNT_ID",
     "BUSINESS_NAME", "BUSINESS_WEBSITE", "CONTACT_EMAIL",
     "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD",
-    "POST_DAYS", "POST_HOUR", "POST_MINUTE",
+    "POST_DAYS", "POST_HOUR", "POST_MINUTE", "TIMEZONE",
     "APPROVAL_REQUIRED", "VPS_HOST", "APPROVAL_PORT",
 }
 
@@ -1465,7 +1483,7 @@ class _Handler(BaseHTTPRequestHandler):
             try:
                 from src.notifier import send_approval_email
                 from config import config
-                review_url = f"http://{config.vps_host}:{config.approval_port}/review?token={draft['token']}"
+                review_url = config.get_public_url(f"/review?token={draft['token']}")
                 send_approval_email(draft, review_url)
             except Exception as e:
                 logger.warning(f"Could not send approval email: {e}")
@@ -1512,7 +1530,7 @@ class _Handler(BaseHTTPRequestHandler):
             img_prompt = imagen_client.build_image_prompt("custom", prompt, "Business")
             image_path = imagen_client.generate_image(img_prompt, filename=f"create_{ts}.png")
             fname = os.path.basename(image_path)
-            url = f"http://{config.vps_host}:{config.approval_port}/media/{fname}"
+            url = config.get_public_url(f"/media/{fname}")
             self._send_json({"url": url})
         except Exception as e:
             logger.exception("AI image generation failed")

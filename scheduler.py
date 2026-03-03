@@ -14,13 +14,15 @@ def start_scheduler():
         from main import run_job as job_fn
         logger.info("No approval required — scheduler will post directly")
 
-    scheduler = BlockingScheduler(timezone="UTC")
+    tz = config.timezone or "UTC"
+    scheduler = BlockingScheduler(timezone=tz)
     scheduler.add_job(
         job_fn,
         trigger=CronTrigger(
             day_of_week=config.post_days,
             hour=config.post_hour,
             minute=config.post_minute,
+            timezone=tz,
         ),
         name="content_marketing_post",
         misfire_grace_time=3600,   # Allow up to 1h late if server was down
@@ -29,7 +31,7 @@ def start_scheduler():
 
     logger.info(
         f"Scheduler started. Next runs: {config.post_days} at "
-        f"{config.post_hour:02d}:{config.post_minute:02d} UTC"
+        f"{config.post_hour:02d}:{config.post_minute:02d} {tz}"
     )
 
     try:
