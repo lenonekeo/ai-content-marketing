@@ -11,6 +11,14 @@ BASE_URL = "https://api.heygen.com"
 
 def create_video(script: str) -> str:
     """Submit a HeyGen avatar video generation job. Returns video_id."""
+    if not config.heygen_api_key:
+        raise RuntimeError("HEYGEN_API_KEY is not set — go to Setup and enter your HeyGen API key.")
+    if not config.heygen_avatar_id:
+        raise RuntimeError("HEYGEN_AVATAR_ID is not set — go to Setup and enter your avatar ID.")
+    if not config.heygen_voice_id:
+        raise RuntimeError("HEYGEN_VOICE_ID is not set — go to Setup and enter your voice ID.")
+
+    logger.info(f"HeyGen create_video: avatar_id={config.heygen_avatar_id!r} voice_id={config.heygen_voice_id!r} key_prefix={config.heygen_api_key[:8]}...")
     url = f"{BASE_URL}/v2/video/generate"
     payload = {
         "video_inputs": [
