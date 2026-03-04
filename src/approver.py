@@ -1314,8 +1314,14 @@ async function generateVideo(type) {{
   const veo3Btn = document.getElementById("veo3-btn");
   const heygenBtn = document.getElementById("heygen-btn");
 
+  function _endJob() {{
+    spinner.style.display = "none";
+    if (veo3Btn) veo3Btn.disabled = false;
+    if (heygenBtn) heygenBtn.disabled = false;
+  }}
+
   spinner.style.display = "inline-flex";
-  status.textContent = type === "veo3" ? "Submitting to VEO 3 (takes ~2 min)..." : "Submitting to HeyGen (takes 2-5 min)...";
+  status.textContent = type === "veo3" ? "Submitting to VEO 3..." : "Submitting to HeyGen...";
   if (veo3Btn) veo3Btn.disabled = true;
   if (heygenBtn) heygenBtn.disabled = true;
 
@@ -1326,36 +1332,40 @@ async function generateVideo(type) {{
       body: (type === "veo3" ? "prompt=" : "script=") + encodeURIComponent(script)
     }});
     const data = await resp.json();
-    if (data.error) {{ status.textContent = "Error: " + data.error; return; }}
+    if (data.error) {{
+      status.textContent = "Error: " + data.error;
+      _endJob();
+      return;
+    }}
     const jobId = data.job_id;
-    // Poll for completion
+    status.textContent = type === "veo3" ? "⏳ VEO 3 generating (~2 min)..." : "⏳ HeyGen generating avatar (2–5 min)...";
+    // Poll for completion — spinner stays visible until done/error
+    let pollCount = 0;
     const poll = setInterval(async () => {{
       try {{
+        pollCount++;
         const sr = await fetch("/create/video/status?job_id=" + encodeURIComponent(jobId));
         const sd = await sr.json();
         if (sd.status === "done") {{
           clearInterval(poll);
-          spinner.style.display = "none";
           document.getElementById("video_url").value = sd.url;
           previewVideo();
-          status.textContent = "Video ready!";
-          // Show draft section if not visible
+          status.textContent = "✓ Video ready! URL filled below.";
           document.getElementById("draft-section").style.display = "block";
+          _endJob();
         }} else if (sd.status === "error") {{
           clearInterval(poll);
-          spinner.style.display = "none";
-          status.textContent = "Error: " + (sd.error || "Generation failed");
+          status.textContent = "✗ Error: " + (sd.error || "Generation failed");
+          _endJob();
         }} else {{
-          status.textContent = (type === "veo3" ? "Generating VEO 3 video" : "Generating HeyGen avatar") + "...";
+          const dots = ".".repeat((pollCount % 3) + 1);
+          status.textContent = (type === "veo3" ? "⏳ VEO 3 generating" : "⏳ HeyGen generating avatar") + dots;
         }}
-      }} catch(e) {{ /* ignore poll errors */ }}
+      }} catch(e) {{ /* ignore transient poll errors */ }}
     }}, 8000);
   }} catch(e) {{
     status.textContent = "Request failed: " + e.message;
-  }} finally {{
-    spinner.style.display = "none";
-    if (veo3Btn) veo3Btn.disabled = false;
-    if (heygenBtn) heygenBtn.disabled = false;
+    _endJob();
   }}
 }}
 
