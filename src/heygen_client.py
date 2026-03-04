@@ -9,6 +9,21 @@ logger = logging.getLogger(__name__)
 BASE_URL = "https://api.heygen.com"
 
 
+def list_avatars(api_key: str) -> list:
+    """Return list of available avatars for the given API key."""
+    url = f"{BASE_URL}/v2/avatars"
+    resp = requests.get(url, headers={"X-Api-Key": api_key}, timeout=15)
+    if not resp.ok:
+        try:
+            err_body = resp.json()
+        except Exception:
+            err_body = resp.text
+        raise RuntimeError(f"HeyGen API error {resp.status_code}: {err_body}")
+    data = resp.json()
+    avatars = data.get("data", {}).get("avatars", []) or data.get("data", []) or []
+    return avatars
+
+
 def create_video(script: str) -> str:
     """Submit a HeyGen avatar video generation job. Returns video_id."""
     if not config.heygen_api_key:

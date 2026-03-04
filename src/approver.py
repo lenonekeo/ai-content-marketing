@@ -580,14 +580,21 @@ def _page_setup(alert: str = "", alert_type: str = "success") -> str:
       </div>
       <div class="grid-2">
         <div class="field">
-          <label>Avatar ID</label>
-          <input type="text" name="HEYGEN_AVATAR_ID" value="{val("HEYGEN_AVATAR_ID")}">
+          <label>Avatar ID <span class="hint">use the ID from "List My Avatars" below</span></label>
+          <input type="text" id="heygen_avatar_id_input" name="HEYGEN_AVATAR_ID" value="{val("HEYGEN_AVATAR_ID")}">
         </div>
         <div class="field">
           <label>Voice ID</label>
           <input type="text" name="HEYGEN_VOICE_ID" value="{val("HEYGEN_VOICE_ID")}">
         </div>
       </div>
+      <div style="margin-top:12px">
+        <button type="button" class="btn btn-ghost" onclick="listHeygenAvatars()" style="font-size:13px">
+          🔍 List My Avatars
+        </button>
+        <span id="heygen-list-status" style="font-size:13px;color:#888;margin-left:10px"></span>
+      </div>
+      <div id="heygen-avatars-result" style="display:none;margin-top:12px;background:#f8f9fa;border-radius:8px;padding:14px;border:1px solid #e0e0e0;font-size:13px"></div>
     </div>
 
     <div class="card">
@@ -755,7 +762,47 @@ def _page_setup(alert: str = "", alert_type: str = "success") -> str:
       <a href="/" class="btn btn-ghost">Cancel</a>
     </div>
   </form>
-</div></body></html>"""
+</div>
+<script>
+async function listHeygenAvatars() {{
+  const statusEl = document.getElementById("heygen-list-status");
+  const resultEl = document.getElementById("heygen-avatars-result");
+  statusEl.textContent = "Fetching avatars...";
+  resultEl.style.display = "none";
+  try {{
+    const resp = await fetch("/setup/heygen/avatars");
+    const data = await resp.json();
+    if (data.error) {{
+      statusEl.textContent = "Error: " + data.error;
+      return;
+    }}
+    const avatars = data.avatars || [];
+    if (!avatars.length) {{
+      statusEl.textContent = "No avatars found in your account.";
+      return;
+    }}
+    statusEl.textContent = avatars.length + " avatar(s) found — click an ID to use it:";
+    let html = '<table style="width:100%;border-collapse:collapse">';
+    html += '<tr style="font-weight:600;border-bottom:2px solid #e0e0e0"><td style="padding:6px 8px">Name</td><td style="padding:6px 8px">Avatar ID</td><td style="padding:6px 8px">Type</td></tr>';
+    for (const av of avatars) {{
+      const avId = av.avatar_id || av.id || "";
+      const avName = av.avatar_name || av.name || "(unnamed)";
+      const avType = av.avatar_type || av.type || "";
+      html += `<tr style="border-bottom:1px solid #f0f0f0;cursor:pointer" onclick="document.getElementById('heygen_avatar_id_input').value='${{avId}}';this.style.background='#d5f5e3'">
+        <td style="padding:7px 8px">${{avName}}</td>
+        <td style="padding:7px 8px;font-family:monospace;font-size:12px;color:#2980b9">${{avId}}</td>
+        <td style="padding:7px 8px;color:#888;font-size:12px">${{avType}}</td>
+      </tr>`;
+    }}
+    html += "</table><p style='margin-top:8px;color:#888;font-size:12px'>Click a row to copy that Avatar ID into the field above, then save.</p>";
+    resultEl.innerHTML = html;
+    resultEl.style.display = "block";
+  }} catch(e) {{
+    statusEl.textContent = "Request failed: " + e.message;
+  }}
+}}
+</script>
+</body></html>"""
 
 
 def _page_influence(alert: str = "") -> str:
@@ -1504,6 +1551,8 @@ class _Handler(BaseHTTPRequestHandler):
                 job_id = qs.get("job_id", [None])[0]
                 job = _video_jobs.get(job_id, {"status": "error", "error": "Unknown job"})
                 self._send_json(job)
+            elif p.path == "/setup/heygen/avatars":
+                self._list_heygen_avatars()
             elif p.path.startswith("/media/"):
                 self._serve_media(p.path[7:])
             elif p.path == "/review":
@@ -1764,6 +1813,22 @@ class _Handler(BaseHTTPRequestHandler):
             self._send_json({"url": url})
         except Exception as e:
             logger.exception("AI image generation failed")
+            self._send_json({"error": str(e)})
+
+    def _list_heygen_avatars(self):
+        """Fetch and return available avatars from HeyGen for the current API key."""
+        try:
+            from dotenv import load_dotenv as _ldenv
+            _ldenv(override=True)
+            import os as _os
+            api_key = _os.getenv("HEYGEN_API_KEY", "") or config.heygen_api_key
+            if not api_key:
+                self._send_json({"error": "HEYGEN_API_KEY is not set in Setup."})
+                return
+            from src import heygen_client
+            avatars = heygen_client.list_avatars(api_key)
+            self._send_json({"avatars": avatars})
+        except Exception as e:
             self._send_json({"error": str(e)})
 
     def _start_video_generation(self, body: dict, path: str):
