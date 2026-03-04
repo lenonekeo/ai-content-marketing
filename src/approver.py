@@ -807,9 +807,14 @@ async function listHeygenAvatars() {{
       }}
       for (const lk of g.looks) {{
         const lkId = lk.id || "";
-        const lkName = lk.name || "(unnamed)";
-        const lkImg = lk.image_url || "";
-        html += _avCard(lkId, lkName, lkImg);
+        const lkName = lk.name || lk.avatar_name || "(unnamed)";
+        const lkImg = lk.image_url || lk.preview_image_url || lk.preview_image || lk.thumbnail_url || "";
+        if (!lkId) {{
+          // Show raw fields for debugging when id is missing
+          html += `<pre style="font-size:9px;color:#888;background:#f5f5f5;padding:6px;border-radius:4px;max-width:200px;overflow:auto">${{JSON.stringify(lk,null,2)}}</pre>`;
+        }} else {{
+          html += _avCard(lkId, lkName, lkImg);
+        }}
       }}
       html += `</div></div>`;
     }}
@@ -1852,18 +1857,40 @@ class _Handler(BaseHTTPRequestHandler):
             groups = heygen_client.list_avatar_groups(api_key)
             result = []
             for g in groups:
-                group_id = g.get("id", "")
-                looks = []
+                group_id = g.get("id", "") or g.get("group_id", "")
+                raw_looks = []
                 try:
-                    looks = heygen_client.list_group_looks(api_key, group_id)
+                    raw_looks = heygen_client.list_group_looks(api_key, group_id)
                 except Exception:
                     pass
+                # Normalize look fields — HeyGen API uses avatar_id/avatar_name/preview_image_url
+                normalized_looks = []
+                for lk in raw_looks:
+                    normalized_looks.append({
+                        "id": lk.get("avatar_id") or lk.get("id") or "",
+                        "name": lk.get("avatar_name") or lk.get("name") or "",
+                        "image_url": (
+                            lk.get("preview_image_url")
+                            or lk.get("preview_image")
+                            or lk.get("image_url")
+                            or lk.get("thumbnail_url")
+                            or ""
+                        ),
+                    })
+                # Also normalize group fields
+                group_name = g.get("group_name") or g.get("name") or "(unnamed)"
+                group_img = (
+                    g.get("preview_image_url")
+                    or g.get("preview_image")
+                    or g.get("image_url")
+                    or ""
+                )
                 result.append({
                     "group_id": group_id,
-                    "group_name": g.get("name", "(unnamed)"),
-                    "preview_image": g.get("preview_image", ""),
-                    "num_looks": g.get("num_looks", len(looks)),
-                    "looks": looks,
+                    "group_name": group_name,
+                    "preview_image": group_img,
+                    "num_looks": g.get("num_looks", len(normalized_looks)),
+                    "looks": normalized_looks,
                 })
             self._send_json({"groups": result})
         except Exception as e:
