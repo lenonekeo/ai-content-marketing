@@ -1492,13 +1492,16 @@ def _start_video_job(job_id: str, video_type: str, text: str):
                 veo3_client.make_video(text, fname)
                 url = _cfg.get_public_url(f"/media/{fname}")
             else:  # heygen
-                import os as _os2
                 from src import heygen_client
+                from src.content_generator import post_to_spoken_script
                 # Use fresh values from env
                 heygen_client.config.heygen_api_key = _os.getenv("HEYGEN_API_KEY", "")
                 heygen_client.config.heygen_avatar_id = _os.getenv("HEYGEN_AVATAR_ID", "")
                 heygen_client.config.heygen_voice_id = _os.getenv("HEYGEN_VOICE_ID", "")
-                video_url = heygen_client.wait_for_video(heygen_client.create_video(text))
+                # Convert the post text to a natural spoken script (removes hashtags, bullets, URLs)
+                spoken_script = post_to_spoken_script(text)
+                logger.info(f"Spoken script for HeyGen ({len(spoken_script)} chars): {spoken_script[:120]}...")
+                video_url = heygen_client.wait_for_video(heygen_client.create_video(spoken_script))
                 url = video_url  # HeyGen returns a public CDN URL directly
             _video_jobs[job_id] = {"status": "done", "url": url}
             logger.info(f"Video job {job_id} ({video_type}) completed: {url}")
