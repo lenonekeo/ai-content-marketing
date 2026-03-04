@@ -9,19 +9,39 @@ logger = logging.getLogger(__name__)
 BASE_URL = "https://api.heygen.com"
 
 
-def list_avatars(api_key: str) -> list:
-    """Return list of available avatars for the given API key."""
-    url = f"{BASE_URL}/v2/avatars"
-    resp = requests.get(url, headers={"X-Api-Key": api_key}, timeout=15)
+def _heygen_get(api_key: str, path: str, params: dict = None) -> dict:
+    """Make an authenticated GET request to the HeyGen API."""
+    resp = requests.get(
+        f"{BASE_URL}{path}",
+        headers={"X-Api-Key": api_key},
+        params=params or {},
+        timeout=15,
+    )
     if not resp.ok:
         try:
             err_body = resp.json()
         except Exception:
             err_body = resp.text
         raise RuntimeError(f"HeyGen API error {resp.status_code}: {err_body}")
-    data = resp.json()
-    avatars = data.get("data", {}).get("avatars", []) or data.get("data", []) or []
-    return avatars
+    return resp.json()
+
+
+def list_avatars(api_key: str) -> list:
+    """Return flat list of stock/public avatars."""
+    data = _heygen_get(api_key, "/v2/avatars")
+    return data.get("data", {}).get("avatars", []) or data.get("data", []) or []
+
+
+def list_avatar_groups(api_key: str) -> list:
+    """Return the user's own avatar groups (AI clones / InstantAvatars)."""
+    data = _heygen_get(api_key, "/v2/avatar_group.list", {"include_public": "false"})
+    return data.get("data", {}).get("avatar_group_list", []) or []
+
+
+def list_group_looks(api_key: str, group_id: str) -> list:
+    """Return individual looks within an avatar group. Each look has its own id used as avatar_id."""
+    data = _heygen_get(api_key, f"/v2/avatar_group/{group_id}/avatars")
+    return data.get("data", {}).get("avatar_list", []) or []
 
 
 def create_video(script: str) -> str:

@@ -764,10 +764,22 @@ def _page_setup(alert: str = "", alert_type: str = "success") -> str:
   </form>
 </div>
 <script>
+function _avCard(id, name, imgUrl) {{
+  const img = imgUrl
+    ? `<img src="${{imgUrl}}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;margin-bottom:6px;display:block">`
+    : `<div style="width:80px;height:80px;background:#e0e0e0;border-radius:8px;margin-bottom:6px;display:flex;align-items:center;justify-content:center;font-size:28px">👤</div>`;
+  return `<div onclick="document.getElementById('heygen_avatar_id_input').value='${{id}}';document.querySelectorAll('.av-card').forEach(c=>{{c.style.border='1px solid #e0e0e0';c.style.background=''}});this.style.border='2px solid #2ecc71';this.style.background='#f0fff4'"
+    class="av-card" title="${{id}}" style="cursor:pointer;padding:10px;border:1px solid #e0e0e0;border-radius:8px;width:110px;text-align:center;font-size:12px;transition:all .15s;flex-shrink:0">
+    ${{img}}
+    <div style="font-weight:600;color:#333;font-size:11px;line-height:1.3;margin-bottom:3px;word-break:break-word">${{name}}</div>
+    <div style="color:#2980b9;font-family:monospace;font-size:9px;word-break:break-all">${{id.slice(0,14)}}...</div>
+  </div>`;
+}}
+
 async function listHeygenAvatars() {{
   const statusEl = document.getElementById("heygen-list-status");
   const resultEl = document.getElementById("heygen-avatars-result");
-  statusEl.textContent = "Fetching avatars...";
+  statusEl.textContent = "Fetching your AI clones and looks...";
   resultEl.style.display = "none";
   try {{
     const resp = await fetch("/setup/heygen/avatars");
@@ -776,38 +788,32 @@ async function listHeygenAvatars() {{
       statusEl.textContent = "Error: " + data.error;
       return;
     }}
-    const avatars = data.avatars || [];
-    if (!avatars.length) {{
-      statusEl.textContent = "No avatars found in your account.";
+    const groups = data.groups || [];
+    if (!groups.length) {{
+      statusEl.textContent = "No avatar groups found. Check your HeyGen account.";
       return;
     }}
-    // Deduplicate by avatar_id, keeping first occurrence
-    const seen = new Set();
-    const unique = avatars.filter(av => {{
-      const id = av.avatar_id || av.id || "";
-      if (seen.has(id)) return false;
-      seen.add(id);
-      return true;
-    }});
-    statusEl.textContent = unique.length + " avatar(s) found — click a row to use it:";
-    let html = '<div style="display:flex;flex-wrap:wrap;gap:12px">';
-    for (const av of unique) {{
-      const avId = av.avatar_id || av.id || "";
-      const avName = av.avatar_name || av.name || "(unnamed)";
-      const avType = av.avatar_type || av.type || "";
-      const thumb = av.preview_image_url || av.preview_video_url || "";
-      const imgHtml = thumb && !thumb.endsWith(".mp4")
-        ? `<img src="${{thumb}}" style="width:64px;height:64px;object-fit:cover;border-radius:6px;margin-bottom:6px;display:block">`
-        : `<div style="width:64px;height:64px;background:#e0e0e0;border-radius:6px;margin-bottom:6px;display:flex;align-items:center;justify-content:center;font-size:22px">👤</div>`;
-      html += `<div onclick="document.getElementById('heygen_avatar_id_input').value='${{avId}}';document.querySelectorAll('.av-card').forEach(c=>c.style.border='1px solid #e0e0e0');this.style.border='2px solid #2ecc71';this.style.background='#f0fff4'"
-        class="av-card" style="cursor:pointer;padding:10px;border:1px solid #e0e0e0;border-radius:8px;width:120px;text-align:center;font-size:12px;transition:all .15s">
-        ${{imgHtml}}
-        <div style="font-weight:600;color:#333;margin-bottom:3px">${{avName}}</div>
-        <div style="color:#2980b9;font-family:monospace;font-size:10px;word-break:break-all">${{avId.slice(0,12)}}...</div>
-        <div style="color:#aaa;font-size:10px;margin-top:2px">${{avType}}</div>
-      </div>`;
+    let totalLooks = groups.reduce((n, g) => n + (g.looks || []).length, 0);
+    statusEl.textContent = groups.length + " AI clone(s) — " + totalLooks + " look(s) total. Click a look to use it:";
+    let html = "";
+    for (const g of groups) {{
+      html += `<div style="margin-bottom:18px">
+        <div style="font-weight:700;font-size:13px;color:#1a1a2e;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #e0e0e0">
+          👤 ${{g.group_name}} <span style="font-weight:400;color:#aaa;font-size:11px">(${{g.looks.length}} look(s))</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px">`;
+      if (!g.looks.length) {{
+        html += `<p style="color:#aaa;font-size:12px">No looks found in this group.</p>`;
+      }}
+      for (const lk of g.looks) {{
+        const lkId = lk.id || "";
+        const lkName = lk.name || "(unnamed)";
+        const lkImg = lk.image_url || "";
+        html += _avCard(lkId, lkName, lkImg);
+      }}
+      html += `</div></div>`;
     }}
-    html += "</div><p style='margin-top:10px;color:#888;font-size:12px'>Click a card to select that avatar, then save.</p>";
+    html += `<p style="margin-top:8px;color:#888;font-size:12px">Click a look card to fill in the Avatar ID field above, then Save Settings.</p>`;
     resultEl.innerHTML = html;
     resultEl.style.display = "block";
   }} catch(e) {{
@@ -1832,7 +1838,7 @@ class _Handler(BaseHTTPRequestHandler):
             self._send_json({"error": str(e)})
 
     def _list_heygen_avatars(self):
-        """Fetch and return available avatars from HeyGen for the current API key."""
+        """Fetch avatar groups + their looks from HeyGen for the current API key."""
         try:
             from dotenv import load_dotenv as _ldenv
             _ldenv(override=True)
@@ -1842,8 +1848,24 @@ class _Handler(BaseHTTPRequestHandler):
                 self._send_json({"error": "HEYGEN_API_KEY is not set in Setup."})
                 return
             from src import heygen_client
-            avatars = heygen_client.list_avatars(api_key)
-            self._send_json({"avatars": avatars})
+            # Get user's own avatar groups (AI clones)
+            groups = heygen_client.list_avatar_groups(api_key)
+            result = []
+            for g in groups:
+                group_id = g.get("id", "")
+                looks = []
+                try:
+                    looks = heygen_client.list_group_looks(api_key, group_id)
+                except Exception:
+                    pass
+                result.append({
+                    "group_id": group_id,
+                    "group_name": g.get("name", "(unnamed)"),
+                    "preview_image": g.get("preview_image", ""),
+                    "num_looks": g.get("num_looks", len(looks)),
+                    "looks": looks,
+                })
+            self._send_json({"groups": result})
         except Exception as e:
             self._send_json({"error": str(e)})
 
