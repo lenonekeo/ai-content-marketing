@@ -807,14 +807,15 @@ async function listHeygenAvatars() {{
       }}
       for (const lk of g.looks) {{
         const lkId = lk.id || "";
-        const lkName = lk.name || lk.avatar_name || "(unnamed)";
-        const lkImg = lk.image_url || lk.preview_image_url || lk.preview_image || lk.thumbnail_url || "";
-        if (!lkId) {{
-          // Show raw fields for debugging when id is missing
-          html += `<pre style="font-size:9px;color:#888;background:#f5f5f5;padding:6px;border-radius:4px;max-width:200px;overflow:auto">${{JSON.stringify(lk,null,2)}}</pre>`;
-        }} else {{
-          html += _avCard(lkId, lkName, lkImg);
-        }}
+        const lkName = lk.name || "(unnamed)";
+        const lkImg = lk.image_url || "";
+        html += _avCard(lkId, lkName, lkImg);
+        // Always show raw API fields for debugging
+        const rawKeys = Object.keys(lk._raw || lk).filter(k => k !== "_raw");
+        html += `<details style="font-size:9px;color:#888;margin-top:4px;width:110px">
+          <summary style="cursor:pointer;color:#2980b9">raw fields</summary>
+          <pre style="background:#f5f5f5;padding:4px;border-radius:4px;overflow:auto;max-height:120px;white-space:pre-wrap">${{JSON.stringify(lk._raw||lk,null,2)}}</pre>
+        </details>`;
       }}
       html += `</div></div>`;
     }}
@@ -1863,7 +1864,7 @@ class _Handler(BaseHTTPRequestHandler):
                     raw_looks = heygen_client.list_group_looks(api_key, group_id)
                 except Exception:
                     pass
-                # Normalize look fields — HeyGen API uses avatar_id/avatar_name/preview_image_url
+                # Normalize look fields — include _raw so frontend can show all fields for debugging
                 normalized_looks = []
                 for lk in raw_looks:
                     normalized_looks.append({
@@ -1876,6 +1877,7 @@ class _Handler(BaseHTTPRequestHandler):
                             or lk.get("thumbnail_url")
                             or ""
                         ),
+                        "_raw": lk,  # Full raw API response for debugging
                     })
                 # Also normalize group fields
                 group_name = g.get("group_name") or g.get("name") or "(unnamed)"
