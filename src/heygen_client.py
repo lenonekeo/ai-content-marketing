@@ -34,8 +34,10 @@ def list_avatars(api_key: str) -> list:
 
 def list_avatar_groups(api_key: str) -> list:
     """Return the user's own avatar groups (AI clones / InstantAvatars)."""
-    data = _heygen_get(api_key, "/v2/avatar_group.list", {"include_public": "false"})
-    return data.get("data", {}).get("avatar_group_list", []) or []
+    data = _heygen_get(api_key, "/v2/avatar_group.list", {"include_public": "true"})
+    all_groups = data.get("data", {}).get("avatar_group_list", []) or []
+    # Only return groups that belong to the user (not pure public/stock groups)
+    return [g for g in all_groups if not g.get("is_public", False) or g.get("is_owner", True)]
 
 
 def list_group_looks(api_key: str, group_id: str) -> list:
