@@ -180,6 +180,11 @@ def generate_draft(text_only: bool = False, no_video: bool = False, force_theme:
         text_only=text_only, no_video=no_video, force_theme=force_theme
     )
 
+    # Include all configured platforms
+    platforms = ["linkedin", "facebook"]
+    if config.instagram_enabled:
+        platforms.append("instagram")
+
     draft = save_draft({
         "theme": theme["type"],
         "industry": industry,
@@ -189,9 +194,10 @@ def generate_draft(text_only: bool = False, no_video: bool = False, force_theme:
         "video_path": video_path,
         "image_path": image_path,
         "video_type": theme.get("video_type", "none"),
+        "platforms": platforms,
     })
 
-    review_url = f"http://{config.vps_host}:{config.approval_port}/review?token={draft['token']}"
+    review_url = config.get_public_url(f"/review?token={draft['token']}")
     notifier.send_approval_email(draft, review_url)
     logger.info(f"Draft ready — approval email sent. Review: {review_url}")
     logger.info("=" * 60)
@@ -268,7 +274,7 @@ def cmd_start():
         start_approval_server(publish_draft, port=config.approval_port)
         logger.info(
             f"Approval server running on port {config.approval_port} — "
-            f"review URL: http://{config.vps_host}:{config.approval_port}/review?token=<token>"
+            f"review URL: {config.get_public_url('/review?token=<token>')}"
         )
     logger.info(
         f"Starting scheduler: {config.post_days} at {config.post_hour:02d}:00 UTC"
