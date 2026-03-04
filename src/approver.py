@@ -1068,7 +1068,10 @@ def _page_create(alert: str = "", alert_type: str = "success") -> str:
         </div>
         <div class="field">
           <label>Video URL <span class="hint">publicly accessible MP4 link</span></label>
-          <input type="text" id="video_url" placeholder="https://...">
+          <input type="text" id="video_url" placeholder="https://..." oninput="previewVideo()">
+          <div id="vid-preview-box" style="display:none;margin-top:8px">
+            <video id="vid-preview" controls style="max-width:100%;border-radius:6px;max-height:200px"></video>
+          </div>
         </div>
       </div>
       <div style="margin-top:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -1285,6 +1288,18 @@ function previewImage() {{
   img.style.display = url ? "block" : "none";
 }}
 
+function previewVideo() {{
+  const url = document.getElementById("video_url").value.trim();
+  const vid = document.getElementById("vid-preview");
+  const box = document.getElementById("vid-preview-box");
+  if (url) {{
+    vid.src = url;
+    box.style.display = "block";
+  }} else {{
+    box.style.display = "none";
+  }}
+}}
+
 function toggleSchedule() {{
   const later = document.querySelector('input[name="sched_type"][value="later"]').checked;
   document.getElementById("sched-picker").style.display = later ? "block" : "none";
@@ -1322,6 +1337,7 @@ async function generateVideo(type) {{
           clearInterval(poll);
           spinner.style.display = "none";
           document.getElementById("video_url").value = sd.url;
+          previewVideo();
           status.textContent = "Video ready!";
           // Show draft section if not visible
           document.getElementById("draft-section").style.display = "block";
@@ -1386,6 +1402,10 @@ def _start_video_job(job_id: str, video_type: str, text: str):
 
     def _run():
         try:
+            # Reload .env so latest Setup credentials are used
+            from dotenv import load_dotenv as _ldenv
+            import os as _os
+            _ldenv(override=True)
             ts = _dtmod.datetime.now().strftime("%Y%m%d_%H%M%S")
             if video_type == "veo3":
                 from src import veo3_client
@@ -1394,7 +1414,12 @@ def _start_video_job(job_id: str, video_type: str, text: str):
                 veo3_client.make_video(text, fname)
                 url = _cfg.get_public_url(f"/media/{fname}")
             else:  # heygen
+                import os as _os2
                 from src import heygen_client
+                # Use fresh values from env
+                heygen_client.config.heygen_api_key = _os.getenv("HEYGEN_API_KEY", "")
+                heygen_client.config.heygen_avatar_id = _os.getenv("HEYGEN_AVATAR_ID", "")
+                heygen_client.config.heygen_voice_id = _os.getenv("HEYGEN_VOICE_ID", "")
                 video_url = heygen_client.wait_for_video(heygen_client.create_video(text))
                 url = video_url  # HeyGen returns a public CDN URL directly
             _video_jobs[job_id] = {"status": "done", "url": url}

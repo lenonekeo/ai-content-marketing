@@ -18,7 +18,6 @@ def create_video(script: str) -> str:
                 "character": {
                     "type": "avatar",
                     "avatar_id": config.heygen_avatar_id,
-                    "avatar_style": "happy",
                 },
                 "voice": {
                     "type": "text",
