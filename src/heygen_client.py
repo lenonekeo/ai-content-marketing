@@ -34,8 +34,15 @@ def create_video(script: str) -> str:
         "Content-Type": "application/json",
     }
     resp = requests.post(url, json=payload, headers=headers, timeout=30)
-    resp.raise_for_status()
+    if not resp.ok:
+        try:
+            err_body = resp.json()
+        except Exception:
+            err_body = resp.text
+        raise RuntimeError(f"HeyGen API error {resp.status_code}: {err_body}")
     data = resp.json()
+    if data.get("error") or not data.get("data"):
+        raise RuntimeError(f"HeyGen API returned error: {data}")
     video_id = data["data"]["video_id"]
     logger.info(f"HeyGen video job created: {video_id}")
     return video_id

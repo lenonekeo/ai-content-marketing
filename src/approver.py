@@ -1355,7 +1355,28 @@ async function generateVideo(type) {{
           _endJob();
         }} else if (sd.status === "error") {{
           clearInterval(poll);
-          status.textContent = "✗ Error: " + (sd.error || "Generation failed");
+          const errMsg = sd.error || "Generation failed";
+          let hint = "";
+          if (type === "heygen") {{
+            if (errMsg.includes("401") || errMsg.toLowerCase().includes("unauthorized") || errMsg.toLowerCase().includes("api key")) {{
+              hint = " → Check your HEYGEN_API_KEY in Setup.";
+            }} else if (errMsg.includes("400") || errMsg.toLowerCase().includes("avatar_id") || errMsg.toLowerCase().includes("invalid")) {{
+              hint = " → Check HEYGEN_AVATAR_ID in Setup (use the Avatar ID from HeyGen dashboard, not the Look ID).";
+            }} else if (errMsg.toLowerCase().includes("voice")) {{
+              hint = " → Check HEYGEN_VOICE_ID in Setup.";
+            }} else if (errMsg.includes("403")) {{
+              hint = " → Your HeyGen plan may not support this feature.";
+            }} else {{
+              hint = " → Go to Setup and verify HEYGEN_API_KEY, HEYGEN_AVATAR_ID, and HEYGEN_VOICE_ID.";
+            }}
+          }} else if (type === "veo3") {{
+            if (errMsg.includes("401") || errMsg.toLowerCase().includes("api key")) {{
+              hint = " → Check your GOOGLE_API_KEY in Setup.";
+            }} else {{
+              hint = " → Check your GOOGLE_API_KEY in Setup.";
+            }}
+          }}
+          status.innerHTML = '<span style="color:#e74c3c">✗ Error: ' + errMsg + '</span><br><span style="color:#e67e22;font-size:12px">' + hint + '</span>';
           _endJob();
         }} else {{
           const dots = ".".repeat((pollCount % 3) + 1);
