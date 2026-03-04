@@ -1193,7 +1193,7 @@ function appendMsg(role, text, showUseThis=false) {{
     btn.className = "use-this-btn";
     btn.textContent = "Use this \u2193";
     btn.onclick = function() {{ useThis(idx); }};
-    div.querySelector("div > div:last-child").after(btn);
+    div.lastElementChild.appendChild(btn);
   }}
   win.appendChild(div);
   win.scrollTop = win.scrollHeight;
