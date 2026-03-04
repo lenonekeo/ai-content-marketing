@@ -56,29 +56,43 @@ def create_video(script: str) -> str:
     return video_id
 
 
-def wait_for_video(video_id: str, timeout: int = 600) -> str:
-    """Poll until video is complete. Returns download URL."""
+def wait_for_video(video_id: str, timeout: int = 1200) -> str:
+    """Poll until video is complete. Returns download URL. Default 20 min timeout."""
     url = f"{BASE_URL}/v1/video_status.get"
     headers = {"X-Api-Key": config.heygen_api_key}
     deadline = time.time() + timeout
-    interval = 10
+    interval = 15
+    elapsed = 0
 
     while time.time() < deadline:
         resp = requests.get(url, params={"video_id": video_id}, headers=headers, timeout=15)
-        resp.raise_for_status()
-        data = resp.json()["data"]
+        if not resp.ok:
+            try:
+                err_body = resp.json()
+            except Exception:
+                err_body = resp.text
+            raise RuntimeError(f"HeyGen status check failed {resp.status_code}: {err_body}")
+        data = resp.json().get("data", {})
         status = data.get("status")
-        logger.info(f"HeyGen video {video_id} status: {status}")
+        logger.info(f"HeyGen video {video_id} status: {status} (elapsed {elapsed}s)")
 
         if status == "completed":
-            return data["video_url"]
+            video_url = data.get("video_url")
+            if not video_url:
+                raise RuntimeError(f"HeyGen completed but no video_url in response: {data}")
+            return video_url
         if status == "failed":
-            raise RuntimeError(f"HeyGen video failed: {data.get('error')}")
+            error_detail = data.get("error") or data.get("msg") or str(data)
+            raise RuntimeError(f"HeyGen video generation failed: {error_detail}")
 
         time.sleep(interval)
-        interval = min(interval * 1.5, 30)
+        elapsed += interval
+        interval = min(interval * 1.3, 30)
 
-    raise TimeoutError(f"HeyGen video {video_id} timed out after {timeout}s")
+    raise TimeoutError(
+        f"HeyGen video {video_id} timed out after {timeout}s — "
+        "the video is still processing in HeyGen. Check your HeyGen dashboard at app.heygen.com/videos to see if it completed."
+    )
 
 
 def download_video(url: str, filename: str) -> str:

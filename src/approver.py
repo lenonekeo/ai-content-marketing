@@ -1338,7 +1338,7 @@ async function generateVideo(type) {{
       return;
     }}
     const jobId = data.job_id;
-    status.textContent = type === "veo3" ? "⏳ VEO 3 generating (~2 min)..." : "⏳ HeyGen generating avatar (2–5 min)...";
+    status.textContent = type === "veo3" ? "⏳ VEO 3 generating (~2 min)..." : "⏳ HeyGen generating avatar (5–20 min — keep this page open)...";
     // Poll for completion — spinner stays visible until done/error
     let pollCount = 0;
     const poll = setInterval(async () => {{
