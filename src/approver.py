@@ -781,20 +781,33 @@ async function listHeygenAvatars() {{
       statusEl.textContent = "No avatars found in your account.";
       return;
     }}
-    statusEl.textContent = avatars.length + " avatar(s) found — click an ID to use it:";
-    let html = '<table style="width:100%;border-collapse:collapse">';
-    html += '<tr style="font-weight:600;border-bottom:2px solid #e0e0e0"><td style="padding:6px 8px">Name</td><td style="padding:6px 8px">Avatar ID</td><td style="padding:6px 8px">Type</td></tr>';
-    for (const av of avatars) {{
+    // Deduplicate by avatar_id, keeping first occurrence
+    const seen = new Set();
+    const unique = avatars.filter(av => {{
+      const id = av.avatar_id || av.id || "";
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    }});
+    statusEl.textContent = unique.length + " avatar(s) found — click a row to use it:";
+    let html = '<div style="display:flex;flex-wrap:wrap;gap:12px">';
+    for (const av of unique) {{
       const avId = av.avatar_id || av.id || "";
       const avName = av.avatar_name || av.name || "(unnamed)";
       const avType = av.avatar_type || av.type || "";
-      html += `<tr style="border-bottom:1px solid #f0f0f0;cursor:pointer" onclick="document.getElementById('heygen_avatar_id_input').value='${{avId}}';this.style.background='#d5f5e3'">
-        <td style="padding:7px 8px">${{avName}}</td>
-        <td style="padding:7px 8px;font-family:monospace;font-size:12px;color:#2980b9">${{avId}}</td>
-        <td style="padding:7px 8px;color:#888;font-size:12px">${{avType}}</td>
-      </tr>`;
+      const thumb = av.preview_image_url || av.preview_video_url || "";
+      const imgHtml = thumb && !thumb.endsWith(".mp4")
+        ? `<img src="${{thumb}}" style="width:64px;height:64px;object-fit:cover;border-radius:6px;margin-bottom:6px;display:block">`
+        : `<div style="width:64px;height:64px;background:#e0e0e0;border-radius:6px;margin-bottom:6px;display:flex;align-items:center;justify-content:center;font-size:22px">👤</div>`;
+      html += `<div onclick="document.getElementById('heygen_avatar_id_input').value='${{avId}}';document.querySelectorAll('.av-card').forEach(c=>c.style.border='1px solid #e0e0e0');this.style.border='2px solid #2ecc71';this.style.background='#f0fff4'"
+        class="av-card" style="cursor:pointer;padding:10px;border:1px solid #e0e0e0;border-radius:8px;width:120px;text-align:center;font-size:12px;transition:all .15s">
+        ${{imgHtml}}
+        <div style="font-weight:600;color:#333;margin-bottom:3px">${{avName}}</div>
+        <div style="color:#2980b9;font-family:monospace;font-size:10px;word-break:break-all">${{avId.slice(0,12)}}...</div>
+        <div style="color:#aaa;font-size:10px;margin-top:2px">${{avType}}</div>
+      </div>`;
     }}
-    html += "</table><p style='margin-top:8px;color:#888;font-size:12px'>Click a row to copy that Avatar ID into the field above, then save.</p>";
+    html += "</div><p style='margin-top:10px;color:#888;font-size:12px'>Click a card to select that avatar, then save.</p>";
     resultEl.innerHTML = html;
     resultEl.style.display = "block";
   }} catch(e) {{
