@@ -1869,6 +1869,7 @@ class _Handler(BaseHTTPRequestHandler):
                 }
 
             result = []
+            clone_ids = set()
 
             # 1. User's own AI clone groups
             try:
@@ -1881,19 +1882,25 @@ class _Handler(BaseHTTPRequestHandler):
                     except Exception:
                         pass
                     group_name = g.get("group_name") or g.get("name") or "(unnamed)"
+                    looks = [_norm_look(lk) for lk in raw_looks]
+                    clone_ids.update(lk["id"] for lk in looks if lk["id"])
                     result.append({
                         "group_id": group_id,
                         "group_name": group_name,
                         "section": "My AI Clones",
-                        "looks": [_norm_look(lk) for lk in raw_looks],
+                        "looks": looks,
                     })
             except Exception:
                 pass
 
-            # 2. Stock / public avatars
+            # 2. Stock / public avatars — exclude any already shown in My AI Clones
             try:
                 stock = heygen_client.list_avatars(api_key)
-                stock_looks = [_norm_look(a) for a in stock if a.get("avatar_id") or a.get("id")]
+                stock_looks = [
+                    _norm_look(a) for a in stock
+                    if (a.get("avatar_id") or a.get("id"))
+                    and (a.get("avatar_id") or a.get("id")) not in clone_ids
+                ]
                 if stock_looks:
                     result.append({
                         "group_id": "",
