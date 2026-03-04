@@ -794,28 +794,28 @@ async function listHeygenAvatars() {{
       return;
     }}
     let totalLooks = groups.reduce((n, g) => n + (g.looks || []).length, 0);
-    statusEl.textContent = groups.length + " AI clone(s) — " + totalLooks + " look(s) total. Click a look to use it:";
+    statusEl.textContent = totalLooks + " avatar(s) found. Click one to use it:";
     let html = "";
+    let lastSection = "";
     for (const g of groups) {{
-      html += `<div style="margin-bottom:18px">
-        <div style="font-weight:700;font-size:13px;color:#1a1a2e;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #e0e0e0">
-          👤 ${{g.group_name}} <span style="font-weight:400;color:#aaa;font-size:11px">(${{g.looks.length}} look(s))</span>
-        </div>
-        <div style="display:flex;flex-wrap:wrap;gap:10px">`;
+      if (g.section !== lastSection) {{
+        lastSection = g.section;
+        const icon = g.section === "My AI Clones" ? "🧬" : "🎭";
+        html += `<div style="font-size:13px;font-weight:700;color:#555;margin:12px 0 6px;border-bottom:2px solid #e0e0e0;padding-bottom:4px">${{icon}} ${{g.section}}</div>`;
+      }}
+      html += `<div style="margin-bottom:18px">`;
+      if (g.group_name !== "Stock Avatars") {{
+        html += `<div style="font-weight:600;font-size:12px;color:#1a1a2e;margin-bottom:8px">👤 ${{g.group_name}} <span style="font-weight:400;color:#aaa;font-size:11px">(${{g.looks.length}} look(s))</span></div>`;
+      }}
+      html += `<div style="display:flex;flex-wrap:wrap;gap:10px">`;
       if (!g.looks.length) {{
-        html += `<p style="color:#aaa;font-size:12px">No looks found in this group.</p>`;
+        html += `<p style="color:#aaa;font-size:12px">No looks found.</p>`;
       }}
       for (const lk of g.looks) {{
         const lkId = lk.id || "";
         const lkName = lk.name || "(unnamed)";
         const lkImg = lk.image_url || "";
         html += _avCard(lkId, lkName, lkImg);
-        // Always show raw API fields for debugging
-        const rawKeys = Object.keys(lk._raw || lk).filter(k => k !== "_raw");
-        html += `<details style="font-size:9px;color:#888;margin-top:4px;width:110px">
-          <summary style="cursor:pointer;color:#2980b9">raw fields</summary>
-          <pre style="background:#f5f5f5;padding:4px;border-radius:4px;overflow:auto;max-height:120px;white-space:pre-wrap">${{JSON.stringify(lk._raw||lk,null,2)}}</pre>
-        </details>`;
       }}
       html += `</div></div>`;
     }}
@@ -1844,7 +1844,7 @@ class _Handler(BaseHTTPRequestHandler):
             self._send_json({"error": str(e)})
 
     def _list_heygen_avatars(self):
-        """Fetch avatar groups + their looks from HeyGen for the current API key."""
+        """Fetch avatar groups (AI clones) + stock avatars from HeyGen."""
         try:
             from dotenv import load_dotenv as _ldenv
             _ldenv(override=True)
@@ -1854,46 +1854,56 @@ class _Handler(BaseHTTPRequestHandler):
                 self._send_json({"error": "HEYGEN_API_KEY is not set in Setup."})
                 return
             from src import heygen_client
-            # Get user's own avatar groups (AI clones)
-            groups = heygen_client.list_avatar_groups(api_key)
+
+            def _norm_look(lk):
+                return {
+                    "id": lk.get("avatar_id") or lk.get("id") or "",
+                    "name": lk.get("avatar_name") or lk.get("name") or "",
+                    "image_url": (
+                        lk.get("preview_image_url")
+                        or lk.get("preview_image")
+                        or lk.get("image_url")
+                        or lk.get("thumbnail_url")
+                        or ""
+                    ),
+                }
+
             result = []
-            for g in groups:
-                group_id = g.get("id", "") or g.get("group_id", "")
-                raw_looks = []
-                try:
-                    raw_looks = heygen_client.list_group_looks(api_key, group_id)
-                except Exception:
-                    pass
-                # Normalize look fields — include _raw so frontend can show all fields for debugging
-                normalized_looks = []
-                for lk in raw_looks:
-                    normalized_looks.append({
-                        "id": lk.get("avatar_id") or lk.get("id") or "",
-                        "name": lk.get("avatar_name") or lk.get("name") or "",
-                        "image_url": (
-                            lk.get("preview_image_url")
-                            or lk.get("preview_image")
-                            or lk.get("image_url")
-                            or lk.get("thumbnail_url")
-                            or ""
-                        ),
-                        "_raw": lk,  # Full raw API response for debugging
+
+            # 1. User's own AI clone groups
+            try:
+                groups = heygen_client.list_avatar_groups(api_key)
+                for g in groups:
+                    group_id = g.get("id", "") or g.get("group_id", "")
+                    raw_looks = []
+                    try:
+                        raw_looks = heygen_client.list_group_looks(api_key, group_id)
+                    except Exception:
+                        pass
+                    group_name = g.get("group_name") or g.get("name") or "(unnamed)"
+                    result.append({
+                        "group_id": group_id,
+                        "group_name": group_name,
+                        "section": "My AI Clones",
+                        "looks": [_norm_look(lk) for lk in raw_looks],
                     })
-                # Also normalize group fields
-                group_name = g.get("group_name") or g.get("name") or "(unnamed)"
-                group_img = (
-                    g.get("preview_image_url")
-                    or g.get("preview_image")
-                    or g.get("image_url")
-                    or ""
-                )
-                result.append({
-                    "group_id": group_id,
-                    "group_name": group_name,
-                    "preview_image": group_img,
-                    "num_looks": g.get("num_looks", len(normalized_looks)),
-                    "looks": normalized_looks,
-                })
+            except Exception:
+                pass
+
+            # 2. Stock / public avatars
+            try:
+                stock = heygen_client.list_avatars(api_key)
+                stock_looks = [_norm_look(a) for a in stock if a.get("avatar_id") or a.get("id")]
+                if stock_looks:
+                    result.append({
+                        "group_id": "",
+                        "group_name": "Stock Avatars",
+                        "section": "Stock Avatars",
+                        "looks": stock_looks,
+                    })
+            except Exception:
+                pass
+
             self._send_json({"groups": result})
         except Exception as e:
             self._send_json({"error": str(e)})
