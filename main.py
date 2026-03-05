@@ -1,4 +1,4 @@
-"""
+﻿"""
 AI Content Marketing App
 Generates AI text + image + video content and posts to LinkedIn & Facebook.
 
@@ -160,8 +160,7 @@ def publish_draft(draft: dict):
     # YouTube upload
     yt_result = {"success": False, "url": None, "error": "not selected"}
     if "youtube" in platforms and config.youtube_enabled:
-        yt_title = draft.get("youtube_title", "") or (draft.get("linkedin_text", "") or "AI Content").split("
-")[0][:100]
+        yt_title = draft.get("youtube_title", "") or (draft.get("linkedin_text", "") or "AI Content").split("\n")[0][:100]
         yt_desc = draft.get("youtube_description", "") or draft.get("linkedin_text", "")
         if not video_path:
             yt_result = {"success": False, "url": None, "error": "No video file for YouTube"}
