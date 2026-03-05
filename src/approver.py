@@ -1079,6 +1079,8 @@ def _page_create(alert: str = "", alert_type: str = "success") -> str:
           <label class="plt-chk"><input type="checkbox" id="plt-linkedin" checked> LinkedIn</label>
           <label class="plt-chk"><input type="checkbox" id="plt-facebook" checked> Facebook</label>
           <label class="plt-chk"><input type="checkbox" id="plt-instagram"> Instagram</label>
+          <label class="plt-chk"><input type="checkbox" id="plt-youtube"> YouTube</label>
+          <label class="plt-chk"><input type="checkbox" id="plt-heygen"> HeyGen Video</label>
         </div>
       </div>
       <div class="field">
@@ -1193,7 +1195,7 @@ let messages = [];
 let selectedPlatforms = ["linkedin", "facebook"];
 
 function getSelectedPlatforms() {{
-  return ["linkedin","facebook","instagram"].filter(p => document.getElementById("plt-"+p).checked);
+  return ["linkedin","facebook","instagram","youtube","heygen"].filter(p => document.getElementById("plt-"+p).checked);
 }}
 function getContentType() {{
   return document.querySelector('input[name="ctype"]:checked').value;
@@ -1550,6 +1552,7 @@ _SETUP_KEYS = {
     "LINKEDIN_ACCESS_TOKEN", "LINKEDIN_PERSON_URN", "LINKEDIN_ORG_URN",
     "FACEBOOK_ACCESS_TOKEN", "FACEBOOK_PAGE_ID",
     "INSTAGRAM_ACCESS_TOKEN", "INSTAGRAM_ACCOUNT_ID",
+    "YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "YOUTUBE_REFRESH_TOKEN", "YOUTUBE_PRIVACY",
     "BUSINESS_NAME", "BUSINESS_WEBSITE", "CONTACT_EMAIL",
     "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD",
     "POST_DAYS", "POST_HOUR", "POST_MINUTE", "TIMEZONE",
@@ -1583,6 +1586,10 @@ class _Handler(BaseHTTPRequestHandler):
                 self._list_heygen_avatars()
             elif p.path == "/setup/heygen/debug":
                 self._heygen_raw_debug()
+            elif p.path == "/setup/youtube/connect":
+                self._youtube_connect()
+            elif p.path == "/setup/youtube/callback":
+                self._youtube_callback(qs)
             elif p.path.startswith("/media/"):
                 self._serve_media(p.path[7:])
             elif p.path == "/review":
@@ -1844,6 +1851,45 @@ class _Handler(BaseHTTPRequestHandler):
         except Exception as e:
             logger.exception("AI image generation failed")
             self._send_json({"error": str(e)})
+
+    def _youtube_connect(self):
+        """Redirect user to Google OAuth for YouTube."""
+        from dotenv import load_dotenv as _ldenv
+        _ldenv(override=True)
+        import os as _os
+        client_id = _os.getenv("YOUTUBE_CLIENT_ID", "") or config.youtube_client_id
+        if not client_id:
+            self._send(400, self._simple_page("Missing Client ID", "Save your YouTube Client ID in Setup first.", "#e74c3c"))
+            return
+        redirect_uri = config.get_public_url("/setup/youtube/callback")
+        from src import youtube_client
+        auth_url = youtube_client.get_auth_url(client_id, redirect_uri)
+        self.send_response(302)
+        self.send_header("Location", auth_url)
+        self.end_headers()
+
+    def _youtube_callback(self, qs):
+        """Handle OAuth callback, exchange code for refresh token, save to .env."""
+        try:
+            from dotenv import load_dotenv as _ldenv
+            _ldenv(override=True)
+            import os as _os
+            code = (qs.get("code", [""])[0] or "").strip()
+            if not code:
+                error = qs.get("error", ["unknown"])[0]
+                self._send(400, self._simple_page("OAuth Error", f"Google returned error: {error}", "#e74c3c"))
+                return
+            client_id = _os.getenv("YOUTUBE_CLIENT_ID", "")
+            client_secret = _os.getenv("YOUTUBE_CLIENT_SECRET", "")
+            redirect_uri = config.get_public_url("/setup/youtube/callback")
+            from src import youtube_client
+            refresh_token = youtube_client.exchange_code(client_id, client_secret, code, redirect_uri)
+            env = _read_env()
+            env["YOUTUBE_REFRESH_TOKEN"] = refresh_token
+            _write_env(env)
+            self._send(200, self._simple_page("YouTube Connected", "YouTube channel connected successfully! You can now publish videos to YouTube.", "#2ecc71"))
+        except Exception as e:
+            self._send(500, self._simple_page("OAuth Failed", f"Error: {_esc(str(e))}", "#e74c3c"))
 
     def _heygen_raw_debug(self):
         """Return raw HeyGen API responses for debugging."""

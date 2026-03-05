@@ -1,4 +1,4 @@
-import os
+﻿import os
 from dotenv import load_dotenv
 
 load_dotenv(override=True)
@@ -48,6 +48,13 @@ class Config:
     facebook_access_token: str = _optional("FACEBOOK_ACCESS_TOKEN")
     facebook_page_id: str = _optional("FACEBOOK_PAGE_ID")
     facebook_enabled: bool = bool(_optional("FACEBOOK_ACCESS_TOKEN"))
+
+    # YouTube
+    youtube_client_id: str = _optional("YOUTUBE_CLIENT_ID")
+    youtube_client_secret: str = _optional("YOUTUBE_CLIENT_SECRET")
+    youtube_refresh_token: str = _optional("YOUTUBE_REFRESH_TOKEN")
+    youtube_privacy: str = _optional("YOUTUBE_PRIVACY", "public")
+    youtube_enabled: bool = bool(_optional("YOUTUBE_REFRESH_TOKEN"))
 
     # Instagram
     instagram_access_token: str = _optional("INSTAGRAM_ACCESS_TOKEN")

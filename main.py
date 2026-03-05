@@ -156,6 +156,29 @@ def publish_draft(draft: dict):
     )
     record["media_used"] = media_used
     record["instagram"] = ig_result
+
+    # YouTube upload
+    yt_result = {"success": False, "url": None, "error": "not selected"}
+    if "youtube" in platforms and config.youtube_enabled:
+        yt_title = draft.get("youtube_title", "") or (draft.get("linkedin_text", "") or "AI Content").split("
+")[0][:100]
+        yt_desc = draft.get("youtube_description", "") or draft.get("linkedin_text", "")
+        if not video_path:
+            yt_result = {"success": False, "url": None, "error": "No video file for YouTube"}
+        else:
+            try:
+                from src import youtube_client
+                yt_url = youtube_client.upload_video(
+                    config.youtube_client_id, config.youtube_client_secret,
+                    config.youtube_refresh_token, video_path,
+                    yt_title, yt_desc, config.youtube_privacy,
+                )
+                yt_result = {"success": True, "url": yt_url, "error": None}
+                logger.info(f"YouTube upload OK: {yt_url}")
+            except Exception as _e:
+                yt_result = {"success": False, "url": None, "error": str(_e)}
+                logger.error(f"YouTube upload failed: {_e}")
+    record["youtube"] = yt_result
     _cleanup(video_path, image_path)
 
     if not record["overall_success"]:
