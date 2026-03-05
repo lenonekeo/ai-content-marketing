@@ -656,6 +656,39 @@ def _page_setup(alert: str = "", alert_type: str = "success") -> str:
       </p>
     </div>
 
+
+    <div class="card">
+      <div class="card-title">YouTube</div>
+      <div class="grid-2">
+        <div class="field">
+          <label>Client ID</label>
+          <input type="text" name="YOUTUBE_CLIENT_ID" value="{val("YOUTUBE_CLIENT_ID")}">
+        </div>
+        <div class="field">
+          <label>Client Secret <span class="hint">leave blank to keep current</span></label>
+          <input type="password" name="YOUTUBE_CLIENT_SECRET" placeholder="{masked("YOUTUBE_CLIENT_SECRET") or "GOCSPX-..."}">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label>Refresh Token <span class="hint">leave blank to keep current</span></label>
+          <input type="password" name="YOUTUBE_REFRESH_TOKEN" placeholder="{masked("YOUTUBE_REFRESH_TOKEN") or "1//0A..."}">
+        </div>
+        <div class="field">
+          <label>Privacy</label>
+          <select name="YOUTUBE_PRIVACY">
+            <option value="public" {"selected" if env.get("YOUTUBE_PRIVACY","public")=="public" else ""}>Public</option>
+            <option value="unlisted" {"selected" if env.get("YOUTUBE_PRIVACY","public")=="unlisted" else ""}>Unlisted</option>
+            <option value="private" {"selected" if env.get("YOUTUBE_PRIVACY","public")=="private" else ""}>Private</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        <a href="/setup/youtube/connect" class="btn btn-ghost" style="font-size:13px">Connect YouTube</a>
+        <span style="font-size:12px;color:#aaa;margin-left:10px">Or manually paste the Refresh Token above.</span>
+      </div>
+    </div>
+
     <div class="card">
       <div class="card-title">Business Info</div>
       <div class="grid-2">

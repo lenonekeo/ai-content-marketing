@@ -206,6 +206,8 @@ def generate_draft(text_only: bool = False, no_video: bool = False, force_theme:
     platforms = ["linkedin", "facebook"]
     if config.instagram_enabled:
         platforms.append("instagram")
+    if config.youtube_enabled:
+        platforms.append("youtube")
 
     draft = save_draft({
         "theme": theme["type"],
