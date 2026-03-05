@@ -39,6 +39,8 @@ class Config:
     linkedin_person_urn: str = _optional("LINKEDIN_PERSON_URN")
     linkedin_org_urn: str = _optional("LINKEDIN_ORG_URN")
     linkedin_enabled: bool = bool(_optional("LINKEDIN_ACCESS_TOKEN"))
+    linkedin_client_id: str = _optional("LINKEDIN_CLIENT_ID")
+    linkedin_client_secret: str = _optional("LINKEDIN_CLIENT_SECRET")
 
     @property
     def linkedin_author_urn(self) -> str:
@@ -48,6 +50,8 @@ class Config:
     facebook_access_token: str = _optional("FACEBOOK_ACCESS_TOKEN")
     facebook_page_id: str = _optional("FACEBOOK_PAGE_ID")
     facebook_enabled: bool = bool(_optional("FACEBOOK_ACCESS_TOKEN"))
+    facebook_app_id: str = _optional("FACEBOOK_APP_ID")
+    facebook_app_secret: str = _optional("FACEBOOK_APP_SECRET")
 
     # YouTube
     youtube_client_id: str = _optional("YOUTUBE_CLIENT_ID")

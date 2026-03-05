@@ -624,6 +624,20 @@ def _page_setup(alert: str = "", alert_type: str = "success") -> str:
           <label>Org URN <span class="hint">optional, for company page</span></label>
           <input type="text" name="LINKEDIN_ORG_URN" value="{val("LINKEDIN_ORG_URN")}">
         </div>
+      <div class="grid-2" style="margin-top:12px">
+        <div class="field">
+          <label>Client ID <span class="hint">from LinkedIn Developer App</span></label>
+          <input type="text" name="LINKEDIN_CLIENT_ID" value="{val("LINKEDIN_CLIENT_ID")}">
+        </div>
+        <div class="field">
+          <label>Client Secret <span class="hint">leave blank to keep current</span></label>
+          <input type="password" name="LINKEDIN_CLIENT_SECRET" placeholder="{masked("LINKEDIN_CLIENT_SECRET") or "..."}">
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        <a href="/setup/linkedin/connect" class="btn btn-ghost" style="font-size:13px">Connect LinkedIn</a>
+        <span style="font-size:12px;color:#aaa;margin-left:10px">Requires HTTPS â€” start your Cloudflare tunnel and set PUBLIC_BASE_URL first.</span>
+      </div>
       </div>
     </div>
 
@@ -636,6 +650,20 @@ def _page_setup(alert: str = "", alert_type: str = "success") -> str:
       <div class="field">
         <label>Page ID</label>
         <input type="text" name="FACEBOOK_PAGE_ID" value="{val("FACEBOOK_PAGE_ID")}">
+      </div>
+      <div class="grid-2" style="margin-top:12px">
+        <div class="field">
+          <label>App ID <span class="hint">from Facebook Developer App</span></label>
+          <input type="text" name="FACEBOOK_APP_ID" value="{val("FACEBOOK_APP_ID")}">
+        </div>
+        <div class="field">
+          <label>App Secret <span class="hint">leave blank to keep current</span></label>
+          <input type="password" name="FACEBOOK_APP_SECRET" placeholder="{masked("FACEBOOK_APP_SECRET") or "..."}">
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        <a href="/setup/facebook/connect" class="btn btn-ghost" style="font-size:13px">Connect Facebook & Instagram</a>
+        <span style="font-size:12px;color:#aaa;margin-left:10px">Saves permanent Page token + Instagram ID automatically. Requires HTTPS.</span>
       </div>
     </div>
 
@@ -1582,8 +1610,8 @@ _SETUP_KEYS = {
     "OPENAI_API_KEY", "OPENAI_MODEL", "OPENAI_TEMPERATURE",
     "HEYGEN_API_KEY", "HEYGEN_AVATAR_ID", "HEYGEN_VOICE_ID",
     "GOOGLE_API_KEY", "GOOGLE_PROJECT_ID",
-    "LINKEDIN_ACCESS_TOKEN", "LINKEDIN_PERSON_URN", "LINKEDIN_ORG_URN",
-    "FACEBOOK_ACCESS_TOKEN", "FACEBOOK_PAGE_ID",
+    "LINKEDIN_CLIENT_ID", "LINKEDIN_CLIENT_SECRET", "LINKEDIN_ACCESS_TOKEN", "LINKEDIN_PERSON_URN", "LINKEDIN_ORG_URN",
+    "FACEBOOK_APP_ID", "FACEBOOK_APP_SECRET", "FACEBOOK_ACCESS_TOKEN", "FACEBOOK_PAGE_ID",
     "INSTAGRAM_ACCESS_TOKEN", "INSTAGRAM_ACCOUNT_ID",
     "YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "YOUTUBE_REFRESH_TOKEN", "YOUTUBE_PRIVACY",
     "BUSINESS_NAME", "BUSINESS_WEBSITE", "CONTACT_EMAIL",
@@ -1623,6 +1651,16 @@ class _Handler(BaseHTTPRequestHandler):
                 self._youtube_connect()
             elif p.path == "/setup/youtube/callback":
                 self._youtube_callback(qs)
+            elif p.path == "/setup/facebook/connect":
+                self._facebook_connect()
+            elif p.path == "/setup/facebook/callback":
+                self._facebook_callback(qs)
+            elif p.path == "/setup/linkedin/connect":
+                self._linkedin_connect()
+            elif p.path == "/setup/linkedin/callback":
+                self._linkedin_callback(qs)
+            elif p.path == "/setup/heygen/test":
+                self._heygen_test()
             elif p.path.startswith("/media/"):
                 self._serve_media(p.path[7:])
             elif p.path == "/review":
@@ -1925,6 +1963,165 @@ class _Handler(BaseHTTPRequestHandler):
             self._send(200, self._simple_page("YouTube Connected", "YouTube channel connected successfully! You can now publish videos to YouTube.", "#2ecc71"))
         except Exception as e:
             self._send(500, self._simple_page("OAuth Failed", f"Error: {_esc(str(e))}", "#e74c3c"))
+
+    def _facebook_connect(self):
+        """Redirect to Facebook OAuth."""
+        from config import config as _cfg
+        from dotenv import load_dotenv as _ldenv
+        import os as _os
+        from urllib.parse import urlencode as _ue
+        _ldenv(override=True)
+        app_id = _os.getenv("FACEBOOK_APP_ID", "")
+        if not app_id:
+            self._send(400, self._simple_page("Missing App ID", "Save your Facebook App ID in Setup first.", "#e74c3c"))
+            return
+        redirect_uri = _cfg.get_public_url("/setup/facebook/callback")
+        auth_url = "https://www.facebook.com/v18.0/dialog/oauth?" + _ue({
+            "client_id": app_id,
+            "redirect_uri": redirect_uri,
+            "scope": "pages_manage_posts,pages_read_engagement,pages_show_list,instagram_basic,instagram_content_publish,business_management",
+            "response_type": "code",
+        })
+        self.send_response(302)
+        self.send_header("Location", auth_url)
+        self.end_headers()
+
+    def _facebook_callback(self, qs):
+        """Exchange Facebook code for permanent page token + Instagram ID."""
+        import requests as _req
+        from dotenv import load_dotenv as _ldenv
+        import os as _os
+        from config import config as _cfg
+        _ldenv(override=True)
+        try:
+            code = (qs.get("code", [""])[0] or "").strip()
+            if not code:
+                err = qs.get("error_description", qs.get("error", ["unknown"]))[0]
+                self._send(400, self._simple_page("OAuth Error", f"Facebook error: {_esc(str(err))}", "#e74c3c"))
+                return
+            app_id = _os.getenv("FACEBOOK_APP_ID", "")
+            app_secret = _os.getenv("FACEBOOK_APP_SECRET", "")
+            redirect_uri = _cfg.get_public_url("/setup/facebook/callback")
+            # Short-lived user token
+            r1 = _req.get("https://graph.facebook.com/v18.0/oauth/access_token", params={
+                "client_id": app_id, "client_secret": app_secret,
+                "code": code, "redirect_uri": redirect_uri,
+            }, timeout=15)
+            r1.raise_for_status()
+            short_token = r1.json()["access_token"]
+            # Long-lived user token (60 days)
+            r2 = _req.get("https://graph.facebook.com/v18.0/oauth/access_token", params={
+                "grant_type": "fb_exchange_token", "client_id": app_id,
+                "client_secret": app_secret, "fb_exchange_token": short_token,
+            }, timeout=15)
+            r2.raise_for_status()
+            long_token = r2.json()["access_token"]
+            # Get pages and their permanent tokens
+            r3 = _req.get("https://graph.facebook.com/v18.0/me/accounts", params={
+                "access_token": long_token, "fields": "id,name,access_token",
+            }, timeout=15)
+            r3.raise_for_status()
+            pages = r3.json().get("data", [])
+            env = _read_env()
+            ig_id = ""
+            pages_info = "none"
+            if pages:
+                page = pages[0]
+                env["FACEBOOK_ACCESS_TOKEN"] = page["access_token"]
+                env["FACEBOOK_PAGE_ID"] = page["id"]
+                env["INSTAGRAM_ACCESS_TOKEN"] = page["access_token"]
+                pages_info = f"{page['name']} ({page['id']})"
+                r4 = _req.get(f"https://graph.facebook.com/v18.0/{page['id']}", params={
+                    "fields": "instagram_business_account", "access_token": page["access_token"],
+                }, timeout=15)
+                if r4.ok:
+                    ig_data = r4.json().get("instagram_business_account", {})
+                    ig_id = ig_data.get("id", "")
+                    if ig_id:
+                        env["INSTAGRAM_ACCOUNT_ID"] = ig_id
+            _write_env(env)
+            self._send(200, self._simple_page("Facebook & Instagram Connected",
+                f"Page: {pages_info} | Instagram ID: {ig_id or 'not linked'}. Permanent tokens saved!", "#2ecc71"))
+        except Exception as e:
+            self._send(500, self._simple_page("OAuth Failed", f"Error: {_esc(str(e))}", "#e74c3c"))
+
+    def _linkedin_connect(self):
+        """Redirect to LinkedIn OAuth."""
+        from config import config as _cfg
+        from dotenv import load_dotenv as _ldenv
+        import os as _os
+        import secrets as _sec
+        from urllib.parse import urlencode as _ue
+        _ldenv(override=True)
+        client_id = _os.getenv("LINKEDIN_CLIENT_ID", "")
+        if not client_id:
+            self._send(400, self._simple_page("Missing Client ID", "Save your LinkedIn Client ID in Setup first.", "#e74c3c"))
+            return
+        redirect_uri = _cfg.get_public_url("/setup/linkedin/callback")
+        auth_url = "https://www.linkedin.com/oauth/v2/authorization?" + _ue({
+            "response_type": "code",
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "state": _sec.token_urlsafe(16),
+            "scope": "w_member_social r_liteprofile",
+        })
+        self.send_response(302)
+        self.send_header("Location", auth_url)
+        self.end_headers()
+
+    def _linkedin_callback(self, qs):
+        """Exchange LinkedIn code for access token + person URN."""
+        import requests as _req
+        from dotenv import load_dotenv as _ldenv
+        import os as _os
+        from config import config as _cfg
+        _ldenv(override=True)
+        try:
+            code = (qs.get("code", [""])[0] or "").strip()
+            if not code:
+                err = qs.get("error_description", qs.get("error", ["unknown"]))[0]
+                self._send(400, self._simple_page("OAuth Error", f"LinkedIn error: {_esc(str(err))}", "#e74c3c"))
+                return
+            client_id = _os.getenv("LINKEDIN_CLIENT_ID", "")
+            client_secret = _os.getenv("LINKEDIN_CLIENT_SECRET", "")
+            redirect_uri = _cfg.get_public_url("/setup/linkedin/callback")
+            r = _req.post("https://www.linkedin.com/oauth/v2/accessToken", data={
+                "grant_type": "authorization_code", "code": code,
+                "redirect_uri": redirect_uri, "client_id": client_id, "client_secret": client_secret,
+            }, headers={"Content-Type": "application/x-www-form-urlencoded"}, timeout=15)
+            r.raise_for_status()
+            access_token = r.json()["access_token"]
+            me = _req.get("https://api.linkedin.com/v2/me",
+                headers={"Authorization": f"Bearer {access_token}"}, timeout=15)
+            person_urn = ""
+            if me.ok:
+                person_urn = f"urn:li:person:{me.json().get('id', '')}"
+            env = _read_env()
+            env["LINKEDIN_ACCESS_TOKEN"] = access_token
+            if person_urn:
+                env["LINKEDIN_PERSON_URN"] = person_urn
+            _write_env(env)
+            self._send(200, self._simple_page("LinkedIn Connected",
+                f"LinkedIn connected! URN: {person_urn}. Token saved.", "#2ecc71"))
+        except Exception as e:
+            self._send(500, self._simple_page("OAuth Failed", f"Error: {_esc(str(e))}", "#e74c3c"))
+
+    def _heygen_test(self):
+        """Test HeyGen API key and return account info."""
+        from dotenv import load_dotenv as _ldenv
+        import os as _os
+        _ldenv(override=True)
+        try:
+            from src import heygen_client
+            api_key = _os.getenv("HEYGEN_API_KEY", "")
+            if not api_key:
+                self._send_json({"error": "HEYGEN_API_KEY not set"})
+                return
+            groups = heygen_client.list_avatar_groups(api_key)
+            avatars = heygen_client.list_avatars(api_key)
+            self._send_json({"ok": True, "clone_groups": len(groups), "stock_avatars": len(avatars)})
+        except Exception as e:
+            self._send_json({"error": str(e)})
 
     def _heygen_raw_debug(self):
         """Return raw HeyGen API responses for debugging."""
