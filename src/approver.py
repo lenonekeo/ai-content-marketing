@@ -1581,6 +1581,8 @@ class _Handler(BaseHTTPRequestHandler):
                 self._send_json(job)
             elif p.path == "/setup/heygen/avatars":
                 self._list_heygen_avatars()
+            elif p.path == "/setup/heygen/debug":
+                self._heygen_raw_debug()
             elif p.path.startswith("/media/"):
                 self._serve_media(p.path[7:])
             elif p.path == "/review":
@@ -1841,6 +1843,26 @@ class _Handler(BaseHTTPRequestHandler):
             self._send_json({"url": url})
         except Exception as e:
             logger.exception("AI image generation failed")
+            self._send_json({"error": str(e)})
+
+    def _heygen_raw_debug(self):
+        """Return raw HeyGen API responses for debugging."""
+        try:
+            from dotenv import load_dotenv as _ldenv
+            _ldenv(override=True)
+            import os as _os
+            api_key = _os.getenv("HEYGEN_API_KEY", "") or config.heygen_api_key
+            from src import heygen_client
+            groups_raw = heygen_client._heygen_get(api_key, "/v2/avatar_group.list", {"include_public": "false"})
+            result = {"groups_response": groups_raw}
+            groups = groups_raw.get("data", {}).get("avatar_group_list", []) or []
+            result["looks_responses"] = {}
+            for g in groups:
+                gid = g.get("id", "") or g.get("group_id", "")
+                looks_raw = heygen_client._heygen_get(api_key, f"/v2/avatar_group/{gid}/avatars")
+                result["looks_responses"][gid] = looks_raw
+            self._send_json(result)
+        except Exception as e:
             self._send_json({"error": str(e)})
 
     def _list_heygen_avatars(self):
