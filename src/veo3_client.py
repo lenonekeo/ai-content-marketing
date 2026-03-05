@@ -75,8 +75,9 @@ def download_video(uri: str, filename: str) -> str:
     path = os.path.join(config.downloads_dir, filename)
 
     download_url = uri
-    if "?" not in download_url:
-        download_url += f"?key={config.google_api_key}"
+    if "key=" not in download_url:
+        sep = "&" if "?" in download_url else "?"
+        download_url += f"{sep}key={config.google_api_key}"
 
     resp = requests.get(download_url, stream=True, timeout=120)
     resp.raise_for_status()
