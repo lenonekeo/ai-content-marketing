@@ -1,4 +1,4 @@
-"""
+﻿"""
 Draft management and HTTP admin server.
 
 Routes:
@@ -1869,46 +1869,54 @@ class _Handler(BaseHTTPRequestHandler):
                 }
 
             result = []
+            clone_names = set()
             clone_ids = set()
 
-            # 1. User's own AI clone groups
+            # 1. Fetch all avatars once - includes user's clones mixed with stock
+            all_avatars = []
             try:
-                groups = heygen_client.list_avatar_groups(api_key)
-                for g in groups:
-                    group_id = g.get("id", "") or g.get("group_id", "")
-                    raw_looks = []
-                    try:
-                        raw_looks = heygen_client.list_group_looks(api_key, group_id)
-                    except Exception:
-                        pass
-                    group_name = g.get("group_name") or g.get("name") or "(unnamed)"
-                    looks = [_norm_look(lk) for lk in raw_looks]
-                    clone_ids.update(lk["id"] for lk in looks if lk["id"])
-                    result.append({
-                        "group_id": group_id,
-                        "group_name": group_name,
-                        "section": "My AI Clones",
-                        "looks": looks,
-                    })
+                all_avatars = heygen_client.list_avatars(api_key)
             except Exception:
                 pass
 
-            # 2. Stock / public avatars — exclude any already shown in My AI Clones
+            # 2. Get user's AI clone group names from the groups API
             try:
-                stock = heygen_client.list_avatars(api_key)
-                stock_looks = [
-                    _norm_look(a) for a in stock
-                    if (a.get("avatar_id") or a.get("id"))
-                    and (a.get("avatar_id") or a.get("id")) not in clone_ids
-                ]
-                if stock_looks:
-                    result.append({
-                        "group_id": "",
-                        "group_name": "Stock Avatars",
-                        "section": "Stock Avatars",
-                        "looks": stock_looks,
-                    })
+                groups = heygen_client.list_avatar_groups(api_key)
+                for g in groups:
+                    gname = g.get("group_name") or g.get("name") or ""
+                    if gname:
+                        clone_names.add(gname)
             except Exception:
+                pass
+
+            # 3. My AI Clones - all avatars whose name matches a clone group name
+            for gname in sorted(clone_names):
+                looks = [
+                    _norm_look(a) for a in all_avatars
+                    if (a.get("avatar_name") or a.get("name") or "") == gname
+                ]
+                for lk in looks:
+                    if lk["id"]:
+                        clone_ids.add(lk["id"])
+                result.append({
+                    "group_id": "",
+                    "group_name": gname,
+                    "section": "My AI Clones",
+                    "looks": looks,
+                })
+
+            # 4. Stock avatars - everything not already shown as a clone look
+            stock_looks = [
+                _norm_look(a) for a in all_avatars
+                if _norm_look(a)["id"] not in clone_ids
+            ]
+            if stock_looks:
+                result.append({
+                    "group_id": "",
+                    "group_name": "Stock Avatars",
+                    "section": "Stock Avatars",
+                    "looks": stock_looks,
+                })
                 pass
 
             self._send_json({"groups": result})
