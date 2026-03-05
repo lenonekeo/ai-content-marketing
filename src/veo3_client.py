@@ -74,19 +74,35 @@ def download_video(uri: str, filename: str) -> str:
     os.makedirs(config.downloads_dir, exist_ok=True)
     path = os.path.join(config.downloads_dir, filename)
 
-    download_url = uri
-    if "key=" not in download_url:
-        sep = "&" if "?" in download_url else "?"
-        download_url += f"{sep}key={config.google_api_key}"
+    # Try SDK download first (google-genai >= 1.x)
+    try:
+        client = _get_client()
+        # Extract file name from URI: files/xxxx
+        import re as _re
+        m = _re.search(r'files/([^/:?]+)', uri)
+        if m:
+            file_name = f"files/{m.group(1)}"
+            file_bytes = client.files.download(file=file_name)
+            with open(path, "wb") as f:
+                f.write(file_bytes)
+            logger.info(f"VEO video downloaded via SDK to {path}")
+            return path
+    except Exception as sdk_err:
+        logger.warning(f"SDK download failed ({sdk_err}), falling back to HTTP")
 
-    resp = requests.get(download_url, stream=True, timeout=120)
+    # Fallback: HTTP download with API key header
+    download_url = uri
+    if "alt=media" not in download_url:
+        sep = "&" if "?" in download_url else "?"
+        download_url += f"{sep}alt=media"
+    headers = {"x-goog-api-key": config.google_api_key}
+    resp = requests.get(download_url, headers=headers, stream=True, timeout=120)
     resp.raise_for_status()
     with open(path, "wb") as f:
         for chunk in resp.iter_content(chunk_size=8192):
             f.write(chunk)
-    logger.info(f"VEO video downloaded to {path}")
+    logger.info(f"VEO video downloaded via HTTP to {path}")
     return path
-
 
 def make_video(prompt: str, filename: str = "veo3_video.mp4") -> str:
     """Full pipeline: generate → poll → download. Returns local path."""
