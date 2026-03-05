@@ -1887,14 +1887,15 @@ class _Handler(BaseHTTPRequestHandler):
 
     def _youtube_connect(self):
         """Redirect user to Google OAuth for YouTube."""
+        from config import config as _config
         from dotenv import load_dotenv as _ldenv
         _ldenv(override=True)
         import os as _os
-        client_id = _os.getenv("YOUTUBE_CLIENT_ID", "") or config.youtube_client_id
+        client_id = _os.getenv("YOUTUBE_CLIENT_ID", "") or _config.youtube_client_id
         if not client_id:
             self._send(400, self._simple_page("Missing Client ID", "Save your YouTube Client ID in Setup first.", "#e74c3c"))
             return
-        redirect_uri = config.get_public_url("/setup/youtube/callback")
+        redirect_uri = _config.get_public_url("/setup/youtube/callback")
         from src import youtube_client
         auth_url = youtube_client.get_auth_url(client_id, redirect_uri)
         self.send_response(302)
@@ -1907,6 +1908,7 @@ class _Handler(BaseHTTPRequestHandler):
             from dotenv import load_dotenv as _ldenv
             _ldenv(override=True)
             import os as _os
+            from config import config as _config
             code = (qs.get("code", [""])[0] or "").strip()
             if not code:
                 error = qs.get("error", ["unknown"])[0]
@@ -1914,7 +1916,7 @@ class _Handler(BaseHTTPRequestHandler):
                 return
             client_id = _os.getenv("YOUTUBE_CLIENT_ID", "")
             client_secret = _os.getenv("YOUTUBE_CLIENT_SECRET", "")
-            redirect_uri = config.get_public_url("/setup/youtube/callback")
+            redirect_uri = _config.get_public_url("/setup/youtube/callback")
             from src import youtube_client
             refresh_token = youtube_client.exchange_code(client_id, client_secret, code, redirect_uri)
             env = _read_env()
