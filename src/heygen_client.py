@@ -1,4 +1,4 @@
-import time
+﻿import time
 import logging
 import os
 import requests
@@ -39,9 +39,19 @@ def list_avatar_groups(api_key: str) -> list:
 
 
 def list_group_looks(api_key: str, group_id: str) -> list:
-    """Return individual looks within an avatar group. Each look has its own id used as avatar_id."""
-    data = _heygen_get(api_key, f"/v2/avatar_group/{group_id}/avatars")
-    return data.get("data", {}).get("avatar_list", []) or []
+    """Return all looks within an avatar group, handling pagination."""
+    all_looks = []
+    page = 1
+    while True:
+        data = _heygen_get(api_key, f"/v2/avatar_group/{group_id}/avatars", {"page": page, "limit": 100})
+        page_data = data.get("data", {})
+        looks = page_data.get("avatar_list", []) or []
+        all_looks.extend(looks)
+        total = page_data.get("total", 0)
+        if not looks or len(all_looks) >= total or len(looks) < 100:
+            break
+        page += 1
+    return all_looks
 
 
 def create_video(script: str) -> str:
