@@ -1,4 +1,4 @@
-import time
+﻿import time
 import logging
 import os
 import requests
@@ -43,11 +43,14 @@ def wait_for_video(operation: any, timeout: int = 300) -> str:
     deadline = time.time() + timeout
     interval = 15
 
-    # Support both string operation name (old) and operation object (new)
-    op_name = getattr(operation, "name", operation)
-
     while time.time() < deadline:
-        op = client.operations.get(op_name)
+        # Newer SDK expects the operation object; older SDK expects name string
+        try:
+            op = client.operations.get(operation)
+        except (TypeError, AttributeError):
+            op_name = getattr(operation, "name", operation)
+            op = client.operations.get(op_name)
+
         logger.info(f"VEO operation status: done={op.done}")
 
         if op.done:
@@ -60,11 +63,11 @@ def wait_for_video(operation: any, timeout: int = 300) -> str:
             logger.info(f"VEO video ready: {uri}")
             return uri
 
+        operation = op
         time.sleep(interval)
         interval = min(interval * 1.3, 30)
 
     raise TimeoutError(f"VEO operation timed out after {timeout}s")
-
 
 def download_video(uri: str, filename: str) -> str:
     """Download VEO video to downloads/. Returns local path."""
