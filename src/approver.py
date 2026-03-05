@@ -1861,6 +1861,11 @@ class _Handler(BaseHTTPRequestHandler):
                 gid = g.get("id", "") or g.get("group_id", "")
                 looks_raw = heygen_client._heygen_get(api_key, f"/v2/avatar_group/{gid}/avatars")
                 result["looks_responses"][gid] = looks_raw
+            # Also check list_avatars for Len Onekeo entries
+            avatars_raw = heygen_client._heygen_get(api_key, "/v2/avatars")
+            all_av = avatars_raw.get("data", {}).get("avatars", []) or []
+            result["my_avatars_in_list"] = [a for a in all_av if "Len Onekeo" in (a.get("avatar_name") or "")]
+            result["total_avatars_count"] = len(all_av)
             self._send_json(result)
         except Exception as e:
             self._send_json({"error": str(e)})
