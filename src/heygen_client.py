@@ -39,9 +39,20 @@ def list_avatar_groups(api_key: str) -> list:
 
 
 def list_group_looks(api_key: str, group_id: str) -> list:
-    """Return looks within an avatar group."""
+    """Return looks within an avatar group, checking all known field names."""
     data = _heygen_get(api_key, f"/v2/avatar_group/{group_id}/avatars")
-    return data.get("data", {}).get("avatar_list", []) or []
+    d = data.get("data", {}) or {}
+    # HeyGen uses avatar_list for recorded looks; AI-studio looks may be in other fields
+    items = []
+    seen_ids = set()
+    for field in ("avatar_list", "look_list", "avatars", "looks"):
+        for item in (d.get(field) or []):
+            uid = item.get("avatar_id") or item.get("id") or ""
+            if uid not in seen_ids:
+                seen_ids.add(uid)
+                items.append(item)
+    logger.info(f"list_group_looks {group_id} keys={list(d.keys())} total={len(items)}")
+    return items
 
 
 def create_video(script: str) -> str:
