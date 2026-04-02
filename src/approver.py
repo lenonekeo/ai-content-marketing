@@ -427,7 +427,7 @@ def _head(title: str) -> str:
 
 
 def _nav(active: str = "") -> str:
-    pages = [("/", "Dashboard"), ("/create", "Create"), ("/setup", "Setup"), ("/influence", "Content Influence"), ("/calendar", "Calendar")]
+    pages = [("/", "Dashboard"), ("/create", "Create"), ("/render", "🎬 Render"), ("/setup", "Setup"), ("/influence", "Content Influence"), ("/calendar", "Calendar")]
     links = "".join(
         f'<a href="{href}" class="{"active" if active == href else ""}">{name}</a>'
         for href, name in pages
@@ -440,6 +440,123 @@ def _nav(active: str = "") -> str:
 
 def _esc(s: str) -> str:
     return s.replace("&", "&amp;").replace("<", "&lt;").replace('"', "&quot;")
+
+
+# ---------------------------------------------------------------------------
+# Remotion render jobs
+# ---------------------------------------------------------------------------
+
+_render_jobs: dict = {}  # job_id -> {status, output, error}
+
+REMOTION_COMPOSITIONS = [
+    {"id": "PostCard",       "label": "Post Card",        "desc": "Animated social media post card (1080×1080, 8s)",  "props_hint": '{"text":"Your post text here","businessName":"MakOne BI","website":"makone-bi.com"}'},
+    {"id": "Intro",          "label": "YouTube Intro",    "desc": "Branded intro clip (1920×1080, 3s)",               "props_hint": '{"businessName":"MakOne BI","tagline":"AI Automation Experts"}'},
+    {"id": "Outro",          "label": "YouTube Outro",    "desc": "CTA outro clip (1920×1080, 6s)",                   "props_hint": '{"businessName":"MakOne BI","website":"makone-bi.com","ctaText":"Book a free discovery call"}'},
+    {"id": "ProductLaunch",  "label": "Product Launch",   "desc": "Full product launch video (1920×1080, 25s)",       "props_hint": '{}'},
+    {"id": "AvatarShowcase", "label": "Avatar Showcase",  "desc": "HeyGen avatar + app screenshots (1920×1080, 14s)", "props_hint": '{}'},
+]
+
+
+def _start_render_job(job_id: str, composition: str, props: str):
+    import threading, subprocess, os, datetime as _dt
+    remotion_dir = os.path.join(os.path.dirname(__file__), '..', 'remotion')
+    remotion_dir = os.path.abspath(remotion_dir)
+    ts = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+    out_file = os.path.join(remotion_dir, "out", f"{composition}_{ts}.mp4")
+    os.makedirs(os.path.join(remotion_dir, "out"), exist_ok=True)
+
+    def _run():
+        try:
+            cmd = ["npx", "remotion", "render", "src/index.jsx", composition, out_file, "--gl=swiftshader"]
+            if props and props.strip() not in ('{}', ''):
+                cmd.append(f"--props={props}")
+            result = subprocess.run(cmd, cwd=remotion_dir, capture_output=True, text=True, timeout=600)
+            if result.returncode != 0:
+                _render_jobs[job_id] = {"status": "error", "error": result.stderr[-800:]}
+            else:
+                fname = os.path.basename(out_file)
+                # Copy to downloads/ so /media/ can serve it
+                import shutil
+                from config import config as _cfg
+                dl_path = os.path.join(os.path.dirname(__file__), '..', _cfg.downloads_dir, fname)
+                shutil.copy2(out_file, dl_path)
+                _render_jobs[job_id] = {"status": "done", "url": _cfg.get_public_url(f"/media/{fname}"), "filename": fname}
+        except Exception as e:
+            _render_jobs[job_id] = {"status": "error", "error": str(e)}
+
+    _render_jobs[job_id] = {"status": "pending"}
+    threading.Thread(target=_run, daemon=True).start()
+
+
+def _page_render() -> str:
+    comp_cards = ""
+    for c in REMOTION_COMPOSITIONS:
+        comp_cards += f"""
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px">
+          <div style="font-weight:700;font-size:16px;color:#1e293b">{c['label']}</div>
+          <div style="font-size:13px;color:#64748b;margin-top:4px">{c['desc']}</div>
+        </div>
+        <div style="flex:2;min-width:260px">
+          <input type="text" id="props-{c['id']}" value='{c['props_hint']}' placeholder='Props JSON'
+            style="width:100%;font-family:monospace;font-size:12px;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;box-sizing:border-box">
+        </div>
+        <button class="btn btn-ghost" onclick="startRender('{c['id']}')" id="btn-{c['id']}" style="white-space:nowrap">
+          ▶ Render
+        </button>
+      </div>
+      <div id="status-{c['id']}" style="margin-top:10px;font-size:13px;color:#64748b;display:none"></div>
+    </div>"""
+
+    return _head("Render Video") + _nav("/render") + f"""
+<div class="container">
+  <h1>🎬 Render Remotion Video</h1>
+  <p class="subtitle">Generate MP4 videos from your Remotion compositions — renders on the server, download when done.</p>
+  {comp_cards}
+</div>
+<script>
+async function startRender(id) {{
+  const props = document.getElementById('props-' + id).value.trim();
+  const btn = document.getElementById('btn-' + id);
+  const status = document.getElementById('status-' + id);
+  btn.disabled = true;
+  status.style.display = 'block';
+  status.textContent = '⏳ Rendering... (this may take a few minutes)';
+  try {{
+    const resp = await fetch('/render/start', {{
+      method: 'POST',
+      headers: {{'Content-Type': 'application/x-www-form-urlencoded'}},
+      body: 'composition=' + encodeURIComponent(id) + '&props=' + encodeURIComponent(props)
+    }});
+    const data = await resp.json();
+    if (data.error) {{ status.textContent = '❌ ' + data.error; btn.disabled = false; return; }}
+    const jobId = data.job_id;
+    let polls = 0;
+    const poll = setInterval(async () => {{
+      polls++;
+      const sr = await fetch('/render/status?job_id=' + encodeURIComponent(jobId));
+      const sd = await sr.json();
+      if (sd.status === 'done') {{
+        clearInterval(poll);
+        btn.disabled = false;
+        status.innerHTML = '✅ Done! <a href="' + sd.url + '" download style="color:#4f8ef7;font-weight:700">⬇ Download ' + sd.filename + '</a>';
+      }} else if (sd.status === 'error') {{
+        clearInterval(poll);
+        btn.disabled = false;
+        status.textContent = '❌ Error: ' + sd.error;
+      }} else {{
+        status.textContent = '⏳ Rendering... (' + (polls * 5) + 's elapsed)';
+      }}
+      if (polls > 120) {{ clearInterval(poll); btn.disabled = false; status.textContent = '⚠️ Timed out — check server logs'; }}
+    }}, 5000);
+  }} catch(e) {{
+    status.textContent = '❌ ' + e.message;
+    btn.disabled = false;
+  }}
+}}
+</script>
+"""
 
 
 # ---------------------------------------------------------------------------
@@ -1823,6 +1940,11 @@ class _Handler(BaseHTTPRequestHandler):
                 self._send(200, _page_influence())
             elif p.path == "/calendar":
                 self._send(200, _page_calendar())
+            elif p.path == "/render":
+                self._send(200, _page_render())
+            elif p.path == "/render/status":
+                job_id = qs.get("job_id", [None])[0]
+                self._send_json(_render_jobs.get(job_id, {"status": "error", "error": "Unknown job"}))
             elif p.path == "/create":
                 self._send(200, _page_create())
             elif p.path == "/create/video/status":
@@ -1886,6 +2008,16 @@ class _Handler(BaseHTTPRequestHandler):
                 self._generate_ai_image(body)
             elif p.path in ("/create/video/veo3", "/create/video/heygen", "/create/video/remotion"):
                 self._start_video_generation(body, p.path)
+            elif p.path == "/render/start":
+                import secrets as _sec
+                composition = body.get("composition", [""])[0].strip()
+                props = body.get("props", ["{}"])[0].strip()
+                if not composition:
+                    self._send_json({"error": "No composition specified"})
+                else:
+                    job_id = _sec.token_urlsafe(12)
+                    _start_render_job(job_id, composition, props)
+                    self._send_json({"job_id": job_id})
             elif p.path == "/publish":
                 li = body.get("linkedin_text", [""])[0]
                 fb = body.get("facebook_text", [""])[0]
