@@ -1,6 +1,6 @@
 import {
   useCurrentFrame, useVideoConfig,
-  interpolate, spring, Sequence, AbsoluteFill, Video
+  interpolate, spring, Sequence, AbsoluteFill, OffthreadVideo, staticFile
 } from "remotion";
 
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
@@ -188,13 +188,7 @@ function SceneDashboard({ heygenUrl }) {
         border: `3px solid ${B_BLUE}`,
         opacity: pipOp, transform: `scale(${pipScale})`, transformOrigin: "top right",
       }}>
-        {heygenUrl ? (
-          <Video src={heygenUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-        ) : (
-          <div style={{ width: "100%", height: "100%", background: "#111", display: "flex", alignItems: "center", justifyContent: "center", color: MUTED, fontSize: 13 }}>
-            AI Avatar
-          </div>
-        )}
+        <OffthreadVideo src={heygenUrl || staticFile("heygen_latest.mp4")} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
       </div>
 
       {/* PiP label */}

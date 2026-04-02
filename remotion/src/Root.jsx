@@ -71,7 +71,7 @@ export const RemotionRoot = () => {
         width={1920}
         height={1080}
         defaultProps={{
-          heygenUrl: "http://187.77.215.140:8080/media/heygen_20260327_110010.mp4",
+          heygenUrl: "",
         }}
       />
     </>
