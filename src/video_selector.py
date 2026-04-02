@@ -43,5 +43,17 @@ def get_video(theme: dict, post_text: str, script: str | None) -> str | None:
             logger.error(f"VEO 3 video failed: {e}")
             return None
 
+    elif video_type == "remotion":
+        if not config.remotion_enabled:
+            logger.warning("Remotion not enabled (REMOTION_ENABLED=false), skipping")
+            return None
+        try:
+            from src import remotion_client
+            filename = f"remotion_{timestamp}.mp4"
+            return remotion_client.render_post_card(post_text, filename)
+        except Exception as e:
+            logger.error(f"Remotion PostCard render failed: {e}")
+            return None
+
     logger.info("No video type set for this theme")
     return None

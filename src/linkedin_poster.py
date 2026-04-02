@@ -3,6 +3,7 @@ import mimetypes
 import os
 import requests
 from config import config
+from src.staging import simulate_post
 
 logger = logging.getLogger(__name__)
 API = "https://api.linkedin.com/v2"
@@ -17,6 +18,8 @@ def _headers() -> dict:
 
 
 def post_text(text: str) -> dict:
+    if config.is_staging:
+        return simulate_post("linkedin", "text", text)
     author = config.linkedin_author_urn
     payload = {
         "author": author,
@@ -41,6 +44,8 @@ def post_text(text: str) -> dict:
 
 
 def post_video(text: str, video_path: str) -> dict:
+    if config.is_staging:
+        return simulate_post("linkedin", "video", text)
     author = config.linkedin_author_urn
     file_size = os.path.getsize(video_path)
 
@@ -115,6 +120,8 @@ def post_video(text: str, video_path: str) -> dict:
 
 def post_image(text: str, image_path: str) -> dict:
     """Post text + image to LinkedIn (3-step: register → upload → create post)."""
+    if config.is_staging:
+        return simulate_post("linkedin", "image", text)
     author = config.linkedin_author_urn
     mime_type = mimetypes.guess_type(image_path)[0] or "image/png"
 

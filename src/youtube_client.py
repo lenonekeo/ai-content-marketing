@@ -55,6 +55,10 @@ def exchange_code(client_id, client_secret, code, redirect_uri):
 
 def upload_video(client_id, client_secret, refresh_token, video_path, title, description, privacy="public"):
     """Upload a video file to YouTube. Returns the YouTube video URL."""
+    from config import config
+    if config.is_staging:
+        from src.staging import simulate_upload
+        return simulate_upload("youtube", title=title)
     import requests
     if not os.path.exists(video_path):
         raise FileNotFoundError(f"Video file not found: {video_path}")

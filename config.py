@@ -95,9 +95,23 @@ class Config:
             return f"{self.public_base_url.rstrip('/')}{path}"
         return f"http://{self.vps_host}:{self.approval_port}{path}"
 
+    # Remotion
+    remotion_enabled: bool = _optional("REMOTION_ENABLED", "true").lower() in ("true", "1", "yes")
+    remotion_yt_stitch: bool = _optional("REMOTION_YT_STITCH", "false").lower() in ("true", "1", "yes")
+
+    # Environment
+    app_env: str = _optional("APP_ENV", "production").lower()
+
+    @property
+    def is_staging(self) -> bool:
+        return self.app_env == "staging"
+
     # Paths
     downloads_dir: str = "downloads"
-    logs_file: str = "logs/posts.jsonl"
+
+    @property
+    def logs_file(self) -> str:
+        return "logs/staging.jsonl" if self.is_staging else "logs/posts.jsonl"
 
 
 config = Config()

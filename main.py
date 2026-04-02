@@ -28,6 +28,11 @@ from config import config
 setup_logging()
 logger = logging.getLogger(__name__)
 
+if config.is_staging:
+    logger.warning("=" * 60)
+    logger.warning("[STAGING] APP_ENV=staging — posts will be simulated, nothing real will be published.")
+    logger.warning("=" * 60)
+
 
 def _cleanup(*paths: str | None):
     for p in paths:
@@ -63,9 +68,12 @@ def _generate_content(text_only: bool = False, no_video: bool = False, force_the
                 logger.error(f"Gemini image generation failed: {e}")
 
         script = None
-        if not no_video and theme.get("script_prompt"):
+        if not no_video:
             try:
-                script = content_generator.generate_script(post_text, theme["script_prompt"])
+                if theme.get("video_type") == "heygen":
+                    script = content_generator.post_to_spoken_script(post_text)
+                elif theme.get("script_prompt"):
+                    script = content_generator.generate_script(post_text, theme["script_prompt"])
             except Exception as e:
                 logger.error(f"Script generation failed: {e}")
 
@@ -81,27 +89,34 @@ def _generate_content(text_only: bool = False, no_video: bool = False, force_the
     return theme, industry, post_text, li_text, fb_text, image_path, video_path
 
 
-def _do_post(li_text: str, fb_text: str, video_path: str | None, image_path: str | None):
+def _do_post(li_text: str, fb_text: str, video_path: str | None, image_path: str | None, platforms: list | None = None):
     """Core posting logic. Returns (li_result, fb_result)."""
-    li_result = {"success": False, "post_id": None, "error": "LinkedIn not configured"}
-    if config.linkedin_enabled and config.linkedin_author_urn:
+    post_li = platforms is None or "linkedin" in platforms
+    post_fb = platforms is None or "facebook" in platforms
+
+    li_result = {"success": False, "post_id": None, "error": "not selected"}
+    if post_li and config.linkedin_enabled and config.linkedin_author_urn:
         if video_path:
             li_result = linkedin_poster.post_video(li_text, video_path)
         elif image_path:
             li_result = linkedin_poster.post_image(li_text, image_path)
         else:
             li_result = linkedin_poster.post_text(li_text)
+    elif not post_li:
+        logger.info("LinkedIn not selected, skipping")
     else:
         logger.warning("LinkedIn not configured, skipping")
 
-    fb_result = {"success": False, "post_id": None, "error": "Facebook not configured"}
-    if config.facebook_enabled and config.facebook_page_id:
+    fb_result = {"success": False, "post_id": None, "error": "not selected"}
+    if post_fb and config.facebook_enabled and config.facebook_page_id:
         if video_path:
             fb_result = facebook_poster.post_video(fb_text, video_path)
         elif image_path:
             fb_result = facebook_poster.post_image(fb_text, image_path)
         else:
             fb_result = facebook_poster.post_text(fb_text)
+    elif not post_fb:
+        logger.info("Facebook not selected, skipping")
     else:
         logger.warning("Facebook not configured, skipping")
 
@@ -111,6 +126,7 @@ def _do_post(li_text: str, fb_text: str, video_path: str | None, image_path: str
 def publish_draft(draft: dict):
     """Post an approved draft to LinkedIn, Facebook, and optionally Instagram."""
     logger.info(f"Publishing approved draft: {draft['draft_id']}")
+    platforms = draft.get("platforms", [])
     li_text = draft.get("linkedin_text", "")
     fb_text = draft.get("facebook_text", "")
     video_path = draft.get("video_path")
@@ -124,27 +140,60 @@ def publish_draft(draft: dict):
         logger.warning(f"Image file missing: {image_path}, falling back")
         image_path = None
 
-    li_result, fb_result = _do_post(li_text, fb_text, video_path, image_path)
+    # If no local file but URL exists, download to temp for LinkedIn/Facebook upload
+    _tmp_video = None
+    _tmp_image = None
+    video_url = draft.get("video_url", "")
+    if not video_path and video_url:
+        try:
+            import tempfile, requests as _req
+            ext = ".mp4"
+            _tmp_video = tempfile.NamedTemporaryFile(suffix=ext, delete=False)
+            _tmp_video.close()
+            r = _req.get(video_url, timeout=120, stream=True)
+            r.raise_for_status()
+            with open(_tmp_video.name, "wb") as f:
+                for chunk in r.iter_content(65536):
+                    f.write(chunk)
+            video_path = _tmp_video.name
+            logger.info(f"Downloaded video URL to temp: {video_path}")
+        except Exception as e:
+            logger.warning(f"Could not download video_url for posting: {e}")
+            video_path = None
+
+    if not image_path and image_url:
+        try:
+            import tempfile, requests as _req, mimetypes as _mt
+            ext = _mt.guess_extension(_mt.guess_type(image_url)[0] or "image/png") or ".png"
+            _tmp_image = tempfile.NamedTemporaryFile(suffix=ext, delete=False)
+            _tmp_image.close()
+            r = _req.get(image_url, timeout=60, stream=True)
+            r.raise_for_status()
+            with open(_tmp_image.name, "wb") as f:
+                for chunk in r.iter_content(65536):
+                    f.write(chunk)
+            image_path = _tmp_image.name
+            logger.info(f"Downloaded image URL to temp: {image_path}")
+        except Exception as e:
+            logger.warning(f"Could not download image_url for posting: {e}")
+            image_path = None
+
+    li_result, fb_result = _do_post(li_text, fb_text, video_path, image_path, platforms)
     media_used = "video" if video_path else ("image" if image_path else "text_only")
 
-    # Instagram (only for drafts that have instagram selected as a platform)
+    # Instagram — uses public URLs directly (API requirement), not local files
     ig_result = {"success": False, "post_id": None, "error": "not selected"}
-    platforms = draft.get("platforms", [])
     if "instagram" in platforms and config.instagram_enabled:
-        ig_caption = draft.get("instagram_caption") or draft.get("post_text", li_text)
-        video_url = draft.get("video_url", "")
-        if video_path:
-            # Local video file — cannot use directly with Instagram (needs public URL)
-            ig_result = {"success": False, "post_id": None, "error": "Local video file not supported for Instagram; use a public video URL"}
-        elif video_url:
+        ig_caption = draft.get("instagram_caption") or li_text
+        # Reject script-style captions (stage directions) — fall back to li_text
+        if ig_caption and ("[" in ig_caption or "Narrator:" in ig_caption or "Opening Shot" in ig_caption):
+            ig_caption = li_text
+        if video_url:
             ig_result = instagram_poster.post_video(ig_caption, video_url)
-        elif image_path:
-            # Local file — cannot use with Instagram
-            ig_result = {"success": False, "post_id": None, "error": "Local image file not supported for Instagram; use an image URL"}
         elif image_url:
             ig_result = instagram_poster.post_image(ig_caption, image_url)
         else:
-            ig_result = {"success": False, "post_id": None, "error": "Instagram requires an image or video URL"}
+            ig_result = {"success": False, "post_id": None, "error": "Instagram requires a public image or video URL"}
         logger.info(f"Instagram: {'OK' if ig_result['success'] else 'FAILED'} — {ig_result.get('error') or ig_result.get('post_id')}")
 
     record = log_execution(
@@ -156,6 +205,17 @@ def publish_draft(draft: dict):
     )
     record["media_used"] = media_used
     record["instagram"] = ig_result
+
+    # Stitch Remotion intro/outro around the video before YouTube upload
+    if "youtube" in platforms and config.remotion_yt_stitch and video_path:
+        try:
+            from src import remotion_client
+            stitched = remotion_client.stitch_intro_outro(video_path)
+            if stitched:
+                logger.info(f"Using stitched video for YouTube: {stitched}")
+                video_path = stitched
+        except Exception as e:
+            logger.warning(f"Intro/outro stitching skipped: {e}")
 
     # YouTube upload
     yt_result = {"success": False, "url": None, "error": "not selected"}
@@ -179,6 +239,14 @@ def publish_draft(draft: dict):
                 logger.error(f"YouTube upload failed: {_e}")
     record["youtube"] = yt_result
     _cleanup(video_path, image_path)
+
+    # Clean up temp files downloaded from video_url / image_url
+    if _tmp_video:
+        try: os.remove(_tmp_video.name)
+        except Exception: pass
+    if _tmp_image:
+        try: os.remove(_tmp_image.name)
+        except Exception: pass
 
     if not record["overall_success"]:
         notifier.send_error_email(record)

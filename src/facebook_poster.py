@@ -1,6 +1,7 @@
 import logging
 import requests
 from config import config
+from src.staging import simulate_post
 
 logger = logging.getLogger(__name__)
 GRAPH = "https://graph.facebook.com/v18.0"
@@ -11,6 +12,8 @@ def _params() -> dict:
 
 
 def post_text(text: str) -> dict:
+    if config.is_staging:
+        return simulate_post("facebook", "text", text)
     url = f"{GRAPH}/{config.facebook_page_id}/feed"
     try:
         resp = requests.post(url, params=_params(), data={"message": text}, timeout=30)
@@ -24,6 +27,8 @@ def post_text(text: str) -> dict:
 
 
 def post_video(text: str, video_path: str) -> dict:
+    if config.is_staging:
+        return simulate_post("facebook", "video", text)
     url = f"{GRAPH}/{config.facebook_page_id}/videos"
     try:
         with open(video_path, "rb") as f:
@@ -45,6 +50,8 @@ def post_video(text: str, video_path: str) -> dict:
 
 def post_image(text: str, image_path: str) -> dict:
     """Post text + image to Facebook Page."""
+    if config.is_staging:
+        return simulate_post("facebook", "image", text)
     url = f"{GRAPH}/{config.facebook_page_id}/photos"
     try:
         with open(image_path, "rb") as f:

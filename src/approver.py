@@ -457,11 +457,21 @@ def _page_dashboard(alert: str = "") -> str:
             theme = d.get("theme", "?").replace("_", " ").title()
             industry = d.get("industry", "?")
             token = d.get("token", "")
+            img_url = d.get("image_url", "")
+            vid_url = d.get("video_url", "")
+            thumb_html = ""
+            if img_url:
+                thumb_html += f'<img src="{_esc(img_url)}" style="height:48px;width:72px;object-fit:cover;border-radius:4px;border:1px solid #e0e0e0;margin-right:6px">'
+            if vid_url:
+                thumb_html += '<span style="display:inline-flex;align-items:center;justify-content:center;height:48px;width:72px;background:#f0f0f0;border-radius:4px;border:1px solid #e0e0e0;font-size:20px;margin-right:6px">🎬</span>'
             drafts_html += f"""
 <div class="draft-row">
-  <div>
-    <strong>{theme}</strong> &nbsp;<span class="badge badge-pending">Pending</span>
-    <div class="draft-meta">{industry} &nbsp;·&nbsp; {ts}</div>
+  <div style="display:flex;align-items:center;gap:10px">
+    {thumb_html}
+    <div>
+      <strong>{theme}</strong> &nbsp;<span class="badge badge-pending">Pending</span>
+      <div class="draft-meta">{industry} &nbsp;·&nbsp; {ts}</div>
+    </div>
   </div>
   <a href="/review?token={token}" class="btn btn-primary">Review &amp; Approve</a>
 </div>"""
@@ -1214,6 +1224,121 @@ def _page_create(alert: str = "", alert_type: str = "success") -> str:
         <span id="img-spinner" style="display:none"><span class="spinner" style="width:20px;height:20px;border-width:2px"></span></span>
         <span id="img-status" style="font-size:13px;color:#888"></span>
       </div>
+      <div id="media-previews" style="display:none;margin-top:20px;border-top:1px solid #eee;padding-top:16px">
+        <div style="font-weight:600;font-size:14px;margin-bottom:12px;color:#333">Generated Media</div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap">
+          <div id="prev-image-wrap" style="display:none;flex:1;min-width:200px">
+            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">AI IMAGE</div>
+            <img id="prev-image" src="" style="max-width:100%;border-radius:8px;border:1px solid #e0e0e0">
+          </div>
+          <div id="prev-video-wrap" style="display:none;flex:1;min-width:200px">
+            <div id="prev-video-label" style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">VIDEO</div>
+            <video id="prev-video" controls style="max-width:100%;border-radius:8px;max-height:220px"></video>
+          </div>
+        </div>
+      </div>
+      <div id="media-previews" style="display:none;margin-top:20px;border-top:1px solid #eee;padding-top:16px">
+        <div style="font-weight:600;font-size:14px;margin-bottom:12px;color:#333">Generated Media</div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap">
+          <div id="prev-image-wrap" style="display:none;flex:1;min-width:220px">
+            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">AI IMAGE</div>
+            <img id="prev-image" src="" style="max-width:100%;border-radius:8px;border:1px solid #e0e0e0">
+          </div>
+          <div id="prev-veo3-wrap" style="display:none;flex:1;min-width:220px">
+            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">VEO3 VIDEO</div>
+            <video id="prev-veo3" controls style="max-width:100%;border-radius:8px;max-height:220px"></video>
+          </div>
+          <div id="prev-heygen-wrap" style="display:none;flex:1;min-width:220px">
+            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">AI CLONE (HEYGEN)</div>
+            <video id="prev-heygen" controls style="max-width:100%;border-radius:8px;max-height:220px"></video>
+          </div>
+        </div>
+      </div>
+      <div id="media-previews" style="display:none;margin-top:20px;border-top:1px solid #eee;padding-top:16px">
+        <div style="font-weight:600;font-size:14px;margin-bottom:12px;color:#333">Generated Media</div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap">
+          <div id="prev-image-wrap" style="display:none;flex:1;min-width:220px">
+            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">AI IMAGE</div>
+            <img id="prev-image" src="" style="max-width:100%;border-radius:8px;border:1px solid #e0e0e0">
+          </div>
+          <div id="prev-veo3-wrap" style="display:none;flex:1;min-width:220px">
+            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">VEO3 VIDEO</div>
+            <video id="prev-veo3" controls style="max-width:100%;border-radius:8px;max-height:220px"></video>
+          </div>
+          <div id="prev-heygen-wrap" style="display:none;flex:1;min-width:220px">
+            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">AI CLONE (HEYGEN)</div>
+            <video id="prev-heygen" controls style="max-width:100%;border-radius:8px;max-height:220px"></video>
+          </div>
+        </div>
+      </div>
+      <div id="media-previews" style="display:none;margin-top:20px;border-top:1px solid #eee;padding-top:16px">
+        <div style="font-weight:600;font-size:14px;margin-bottom:12px;color:#333">Generated Media</div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap">
+          <div id="prev-image-wrap" style="display:none;flex:1;min-width:220px">
+            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">AI IMAGE</div>
+            <img id="prev-image" src="" style="max-width:100%;border-radius:8px;border:1px solid #e0e0e0">
+          </div>
+          <div id="prev-veo3-wrap" style="display:none;flex:1;min-width:220px">
+            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">VEO3 VIDEO</div>
+            <video id="prev-veo3" controls style="max-width:100%;border-radius:8px;max-height:220px"></video>
+          </div>
+          <div id="prev-heygen-wrap" style="display:none;flex:1;min-width:220px">
+            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">AI CLONE (HEYGEN)</div>
+            <video id="prev-heygen" controls style="max-width:100%;border-radius:8px;max-height:220px"></video>
+          </div>
+        </div>
+      </div>
+      <div id="media-previews" style="display:none;margin-top:20px;border-top:1px solid #eee;padding-top:16px">
+        <div style="font-weight:600;font-size:14px;margin-bottom:12px;color:#333">Generated Media</div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap">
+          <div id="prev-image-wrap" style="display:none;flex:1;min-width:220px">
+            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">AI IMAGE</div>
+            <img id="prev-image" src="" style="max-width:100%;border-radius:8px;border:1px solid #e0e0e0">
+          </div>
+          <div id="prev-veo3-wrap" style="display:none;flex:1;min-width:220px">
+            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">VEO3 VIDEO</div>
+            <video id="prev-veo3" controls style="max-width:100%;border-radius:8px;max-height:220px"></video>
+          </div>
+          <div id="prev-heygen-wrap" style="display:none;flex:1;min-width:220px">
+            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">AI CLONE (HEYGEN)</div>
+            <video id="prev-heygen" controls style="max-width:100%;border-radius:8px;max-height:220px"></video>
+          </div>
+        </div>
+      </div>
+      <div id="media-previews" style="display:none;margin-top:20px;border-top:1px solid #eee;padding-top:16px">
+        <div style="font-weight:600;font-size:14px;margin-bottom:12px;color:#333">Generated Media</div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap">
+          <div id="prev-image-wrap" style="display:none;flex:1;min-width:220px">
+            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">AI IMAGE</div>
+            <img id="prev-image" src="" style="max-width:100%;border-radius:8px;border:1px solid #e0e0e0">
+          </div>
+          <div id="prev-veo3-wrap" style="display:none;flex:1;min-width:220px">
+            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">VEO3 VIDEO</div>
+            <video id="prev-veo3" controls style="max-width:100%;border-radius:8px;max-height:220px"></video>
+          </div>
+          <div id="prev-heygen-wrap" style="display:none;flex:1;min-width:220px">
+            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">AI CLONE (HEYGEN)</div>
+            <video id="prev-heygen" controls style="max-width:100%;border-radius:8px;max-height:220px"></video>
+          </div>
+        </div>
+      </div>
+      <div id="media-previews" style="display:none;margin-top:20px;border-top:1px solid #eee;padding-top:16px">
+        <div style="font-weight:600;font-size:14px;margin-bottom:12px;color:#333">Generated Media</div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap">
+          <div id="prev-image-wrap" style="display:none;flex:1;min-width:220px">
+            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">AI IMAGE</div>
+            <img id="prev-image" src="" style="max-width:100%;border-radius:8px;border:1px solid #e0e0e0">
+          </div>
+          <div id="prev-veo3-wrap" style="display:none;flex:1;min-width:220px">
+            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">VEO3 VIDEO</div>
+            <video id="prev-veo3" controls style="max-width:100%;border-radius:8px;max-height:220px"></video>
+          </div>
+          <div id="prev-heygen-wrap" style="display:none;flex:1;min-width:220px">
+            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">AI CLONE (HEYGEN)</div>
+            <video id="prev-heygen" controls style="max-width:100%;border-radius:8px;max-height:220px"></video>
+          </div>
+        </div>
+      </div>
       <div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
         {veo3_btn}
         {heygen_btn}
@@ -1405,6 +1530,27 @@ async function generateAIImage() {{
       document.getElementById("image_url").value = data.url;
       previewImage();
       document.getElementById("img-status").textContent = "Image generated!";
+      document.getElementById("prev-image").src = data.url;
+      document.getElementById("prev-image-wrap").style.display = "block";
+      document.getElementById("media-previews").style.display = "block";
+      document.getElementById("prev-image").src = data.url;
+      document.getElementById("prev-image-wrap").style.display = "block";
+      document.getElementById("media-previews").style.display = "block";
+      document.getElementById("prev-image").src = data.url;
+      document.getElementById("prev-image-wrap").style.display = "block";
+      document.getElementById("media-previews").style.display = "block";
+      document.getElementById("prev-image").src = data.url;
+      document.getElementById("prev-image-wrap").style.display = "block";
+      document.getElementById("media-previews").style.display = "block";
+      document.getElementById("prev-image").src = data.url;
+      document.getElementById("prev-image-wrap").style.display = "block";
+      document.getElementById("media-previews").style.display = "block";
+      document.getElementById("prev-image").src = data.url;
+      document.getElementById("prev-image-wrap").style.display = "block";
+      document.getElementById("media-previews").style.display = "block";
+      document.getElementById("prev-image").src = data.url;
+      document.getElementById("prev-image-wrap").style.display = "block";
+      document.getElementById("media-previews").style.display = "block";
     }} else {{
       document.getElementById("img-status").textContent = data.error || "Generation failed";
     }}
@@ -1486,6 +1632,59 @@ async function generateVideo(type) {{
           document.getElementById("video_url").value = sd.url;
           previewVideo();
           status.textContent = "✓ Video ready! URL filled below.";
+          var vLabel = type === "veo3" ? "VEO3 VIDEO" : "AI CLONE (HEYGEN)";
+          document.getElementById("prev-video-label").textContent = vLabel;
+          document.getElementById("prev-video").src = sd.url;
+          document.getElementById("prev-video-wrap").style.display = "block";
+          document.getElementById("media-previews").style.display = "block";
+          document.getElementById("media-previews").style.display = "block";
+          if (type === "veo3") {{
+            document.getElementById("prev-veo3").src = sd.url;
+            document.getElementById("prev-veo3-wrap").style.display = "block";
+          }} else {{
+            document.getElementById("prev-heygen").src = sd.url;
+            document.getElementById("prev-heygen-wrap").style.display = "block";
+          }}
+          document.getElementById("media-previews").style.display = "block";
+          if (type === "veo3") {{
+            document.getElementById("prev-veo3").src = sd.url;
+            document.getElementById("prev-veo3-wrap").style.display = "block";
+          }} else {{
+            document.getElementById("prev-heygen").src = sd.url;
+            document.getElementById("prev-heygen-wrap").style.display = "block";
+          }}
+          document.getElementById("media-previews").style.display = "block";
+          if (type === "veo3") {{
+            document.getElementById("prev-veo3").src = sd.url;
+            document.getElementById("prev-veo3-wrap").style.display = "block";
+          }} else {{
+            document.getElementById("prev-heygen").src = sd.url;
+            document.getElementById("prev-heygen-wrap").style.display = "block";
+          }}
+          document.getElementById("media-previews").style.display = "block";
+          if (type === "veo3") {{
+            document.getElementById("prev-veo3").src = sd.url;
+            document.getElementById("prev-veo3-wrap").style.display = "block";
+          }} else {{
+            document.getElementById("prev-heygen").src = sd.url;
+            document.getElementById("prev-heygen-wrap").style.display = "block";
+          }}
+          document.getElementById("media-previews").style.display = "block";
+          if (type === "veo3") {{
+            document.getElementById("prev-veo3").src = sd.url;
+            document.getElementById("prev-veo3-wrap").style.display = "block";
+          }} else {{
+            document.getElementById("prev-heygen").src = sd.url;
+            document.getElementById("prev-heygen-wrap").style.display = "block";
+          }}
+          document.getElementById("media-previews").style.display = "block";
+          if (type === "veo3") {
+            document.getElementById("prev-veo3").src = sd.url;
+            document.getElementById("prev-veo3-wrap").style.display = "block";
+          } else {
+            document.getElementById("prev-heygen").src = sd.url;
+            document.getElementById("prev-heygen-wrap").style.display = "block";
+          }
           document.getElementById("draft-section").style.display = "block";
           _endJob();
         }} else if (sd.status === "error") {{
@@ -1575,9 +1774,13 @@ def _start_video_job(job_id: str, video_type: str, text: str):
             ts = _dtmod.datetime.now().strftime("%Y%m%d_%H%M%S")
             if video_type == "veo3":
                 from src import veo3_client
+                from src.content_generator import post_to_veo3_prompt, post_to_spoken_script
                 from config import config as _cfg
                 fname = f"veo3_{ts}.mp4"
-                veo3_client.make_video(text, fname)
+                veo3_prompt = post_to_veo3_prompt(text)
+                veo3_caption = post_to_spoken_script(text)
+                logger.info(f"VEO3 prompt: {veo3_prompt}")
+                veo3_client.make_video(veo3_prompt, fname, caption_text=veo3_caption)
                 url = _cfg.get_public_url(f"/media/{fname}")
             else:  # heygen
                 from src import heygen_client
@@ -1703,7 +1906,9 @@ class _Handler(BaseHTTPRequestHandler):
             elif p.path == "/publish":
                 li = body.get("linkedin_text", [""])[0]
                 fb = body.get("facebook_text", [""])[0]
-                self._publish(token, li, fb)
+                sched_type = body.get("sched_type", ["now"])[0]
+                scheduled_at = body.get("scheduled_at", [""])[0].strip() if sched_type == "later" else ""
+                self._publish(token, li, fb, scheduled_at)
             else:
                 self._send(404, self._simple_page("Not found", "Page not found.", "#e74c3c"))
         except Exception as exc:
@@ -2063,7 +2268,7 @@ class _Handler(BaseHTTPRequestHandler):
             "client_id": client_id,
             "redirect_uri": redirect_uri,
             "state": _sec.token_urlsafe(16),
-            "scope": "w_member_social r_liteprofile",
+            "scope": "w_member_social w_organization_social r_liteprofile",
         })
         self.send_response(302)
         self.send_header("Location", auth_url)
@@ -2253,6 +2458,19 @@ class _Handler(BaseHTTPRequestHandler):
         li = _esc(d.get("linkedin_text", ""))
         fb = _esc(d.get("facebook_text", ""))
         ts = d.get("timestamp", "")[:19].replace("T", " ")
+        image_url = d.get("image_url", "")
+        video_url = d.get("video_url", "")
+        from config import config as _rcfg
+        tz_label = _rcfg.timezone or "UTC"
+
+        media_html = ""
+        if image_url or video_url:
+            media_html = '<div class="card" style="margin-bottom:0"><div class="card-title">Generated Media</div><div style="display:flex;gap:16px;flex-wrap:wrap">'
+            if image_url:
+                media_html += f'<div style="flex:1;min-width:200px"><div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">AI IMAGE</div><img src="{_esc(image_url)}" style="max-width:100%;border-radius:8px;border:1px solid #e0e0e0"></div>'
+            if video_url:
+                media_html += f'<div style="flex:1;min-width:200px"><div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">VIDEO</div><video src="{_esc(video_url)}" controls style="max-width:100%;border-radius:8px;max-height:260px"></video></div>'
+            media_html += '</div></div>'
 
         html = _head(f"Review — {d.get('theme','').replace('_',' ').title()}") + _nav() + f"""
 <div class="container" style="max-width:760px">
@@ -2261,6 +2479,8 @@ class _Handler(BaseHTTPRequestHandler):
     <span class="badge badge-none">{d.get("theme","?").replace("_"," ").title()}</span>
     &nbsp;{d.get("industry","?")} &nbsp;·&nbsp; {ts}
   </p>
+
+  {media_html}
 
   <div class="card">
     <form method="POST" action="/publish?token={token}">
@@ -2272,8 +2492,25 @@ class _Handler(BaseHTTPRequestHandler):
         <label>Facebook Post <span class="hint">editable</span></label>
         <textarea name="facebook_text" style="min-height:220px">{fb}</textarea>
       </div>
+      <div class="field" style="margin-top:20px;padding-top:16px;border-top:1px solid #eee">
+        <div style="font-weight:600;font-size:14px;margin-bottom:10px">Publishing</div>
+        <div style="display:flex;gap:20px;margin-bottom:12px;flex-wrap:wrap">
+          <label style="display:inline-flex;align-items:center;gap:8px;font-weight:normal;cursor:pointer">
+            <input type="radio" name="sched_type" value="now" checked onchange="toggleReviewSched()">
+            Publish Now
+          </label>
+          <label style="display:inline-flex;align-items:center;gap:8px;font-weight:normal;cursor:pointer">
+            <input type="radio" name="sched_type" value="later" onchange="toggleReviewSched()">
+            Schedule for a specific date &amp; time
+          </label>
+        </div>
+        <div id="review-sched-picker" style="display:none">
+          <input type="datetime-local" name="scheduled_at" id="review-scheduled-at" style="max-width:280px">
+          <div style="font-size:12px;color:#888;margin-top:4px">{tz_label} — post will publish automatically at this time</div>
+        </div>
+      </div>
       <div class="section-actions">
-        <button type="submit" class="btn btn-primary">Publish Now</button>
+        <button type="submit" class="btn btn-primary" id="review-submit-btn">Publish Now</button>
         <a href="/" class="btn btn-ghost">Back to Dashboard</a>
       </div>
     </form>
@@ -2285,21 +2522,46 @@ class _Handler(BaseHTTPRequestHandler):
       <button type="submit" class="btn btn-danger">Reject &amp; Discard</button>
     </form>
   </div>
-</div></body></html>"""
+</div>
+<script>
+function toggleReviewSched() {{
+  const later = document.querySelector('input[name="sched_type"][value="later"]').checked;
+  document.getElementById("review-sched-picker").style.display = later ? "block" : "none";
+  document.getElementById("review-submit-btn").textContent = later ? "Schedule" : "Publish Now";
+}}
+</script>
+</body></html>"""
         self._send(200, html)
 
-    def _publish(self, token, li_text, fb_text):
+    def _publish(self, token, li_text, fb_text, scheduled_at: str = ""):
         d = _find_by_token(token)
         if not d:
             self._send(404, self._simple_page("Already processed", "This draft has already been processed.", "#e74c3c"))
             return
-        d["status"] = "approved"
         d["linkedin_text"] = li_text
         d["facebook_text"] = fb_text
-        _update_draft(d)
-        if _publish_callback:
-            threading.Thread(target=_publish_callback, args=(d,), daemon=True).start()
-        self._send(200, self._simple_page("✅ Publishing now...", "Your post is being published to LinkedIn and Facebook. Check your feeds in a few minutes.", "#2ecc71"))
+        if scheduled_at:
+            try:
+                from zoneinfo import ZoneInfo
+                import datetime as _dtmod
+                from config import config as _pcfg
+                tz_name = _pcfg.timezone or "UTC"
+                naive_dt = _dtmod.datetime.fromisoformat(scheduled_at)
+                aware_dt = naive_dt.replace(tzinfo=ZoneInfo(tz_name))
+                utc_dt = aware_dt.astimezone(_dtmod.timezone.utc)
+                d["scheduled_at"] = utc_dt.strftime("%Y-%m-%dT%H:%M:%S")
+            except Exception as _e:
+                logger.warning(f"Review schedule timezone conversion failed: {_e}")
+                d["scheduled_at"] = scheduled_at
+            d["status"] = "pending"
+            _update_draft(d)
+            self._send(200, self._simple_page("📅 Scheduled", f"Your post is scheduled for {scheduled_at}. It will publish automatically.", "#2ecc71"))
+        else:
+            d["status"] = "approved"
+            _update_draft(d)
+            if _publish_callback:
+                threading.Thread(target=_publish_callback, args=(d,), daemon=True).start()
+            self._send(200, self._simple_page("✅ Publishing now...", "Your post is being published to LinkedIn and Facebook. Check your feeds in a few minutes.", "#2ecc71"))
 
     def _reject(self, token):
         d = _find_by_token(token)

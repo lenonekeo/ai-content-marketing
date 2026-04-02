@@ -18,6 +18,16 @@ import requests
 
 logger = logging.getLogger(__name__)
 
+
+def _is_staging():
+    from config import config
+    return config.is_staging
+
+
+def _simulate(post_type: str, caption: str):
+    from src.staging import simulate_post
+    return simulate_post("instagram", post_type, caption)
+
 IG_API_BASE = "https://graph.facebook.com/v18.0"
 
 
@@ -32,6 +42,8 @@ def post_image(caption: str, image_url: str) -> dict:
     image_url must be a publicly accessible HTTPS URL (JPEG or PNG).
     Returns {"success": bool, "post_id": str|None, "error": str|None}.
     """
+    if _is_staging():
+        return _simulate("image", caption)
     token, account_id = _cfg()
     if not token or not account_id:
         return {"success": False, "post_id": None, "error": "Instagram not configured"}
@@ -77,6 +89,8 @@ def post_video(caption: str, video_url: str) -> dict:
     video_url must be a publicly accessible HTTPS URL (MP4, H.264, max 15 min).
     Returns {"success": bool, "post_id": str|None, "error": str|None}.
     """
+    if _is_staging():
+        return _simulate("video", caption)
     token, account_id = _cfg()
     if not token or not account_id:
         return {"success": False, "post_id": None, "error": "Instagram not configured"}
