@@ -1662,38 +1662,6 @@ async function generateVideo(type) {{
             document.getElementById("prev-heygen").src = sd.url;
             document.getElementById("prev-heygen-wrap").style.display = "block";
           }}
-          document.getElementById("media-previews").style.display = "block";
-          if (type === "veo3") {{
-            document.getElementById("prev-veo3").src = sd.url;
-            document.getElementById("prev-veo3-wrap").style.display = "block";
-          }} else {{
-            document.getElementById("prev-heygen").src = sd.url;
-            document.getElementById("prev-heygen-wrap").style.display = "block";
-          }}
-          document.getElementById("media-previews").style.display = "block";
-          if (type === "veo3") {{
-            document.getElementById("prev-veo3").src = sd.url;
-            document.getElementById("prev-veo3-wrap").style.display = "block";
-          }} else {{
-            document.getElementById("prev-heygen").src = sd.url;
-            document.getElementById("prev-heygen-wrap").style.display = "block";
-          }}
-          document.getElementById("media-previews").style.display = "block";
-          if (type === "veo3") {{
-            document.getElementById("prev-veo3").src = sd.url;
-            document.getElementById("prev-veo3-wrap").style.display = "block";
-          }} else {{
-            document.getElementById("prev-heygen").src = sd.url;
-            document.getElementById("prev-heygen-wrap").style.display = "block";
-          }}
-          document.getElementById("media-previews").style.display = "block";
-          if (type === "veo3") {
-            document.getElementById("prev-veo3").src = sd.url;
-            document.getElementById("prev-veo3-wrap").style.display = "block";
-          } else {
-            document.getElementById("prev-heygen").src = sd.url;
-            document.getElementById("prev-heygen-wrap").style.display = "block";
-          }
           document.getElementById("draft-section").style.display = "block";
           _endJob();
         }} else if (sd.status === "error") {{
