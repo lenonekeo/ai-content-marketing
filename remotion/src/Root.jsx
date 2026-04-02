@@ -2,6 +2,8 @@ import { Composition } from "remotion";
 import { PostCard } from "./compositions/PostCard";
 import { Intro } from "./compositions/Intro";
 import { Outro } from "./compositions/Outro";
+import { ProductLaunch } from "./compositions/ProductLaunch";
+import { AvatarShowcase } from "./compositions/AvatarShowcase";
 
 export const RemotionRoot = () => {
   return (
@@ -47,6 +49,29 @@ export const RemotionRoot = () => {
           businessName: "AI Automation Co",
           website: "yourwebsite.com",
           ctaText: "Book a free discovery call",
+        }}
+      />
+
+      {/* Product launch video — 1920x1080, 25 seconds */}
+      <Composition
+        id="ProductLaunch"
+        component={ProductLaunch}
+        durationInFrames={750}
+        fps={30}
+        width={1920}
+        height={1080}
+      />
+
+      {/* Avatar + App showcase — 1920x1080, 14 seconds */}
+      <Composition
+        id="AvatarShowcase"
+        component={AvatarShowcase}
+        durationInFrames={420}
+        fps={30}
+        width={1920}
+        height={1080}
+        defaultProps={{
+          heygenUrl: "http://187.77.215.140:8080/media/heygen_20260327_110010.mp4",
         }}
       />
     </>
