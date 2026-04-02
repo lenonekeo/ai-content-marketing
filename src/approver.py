@@ -1126,6 +1126,11 @@ def _page_create(alert: str = "", alert_type: str = "success") -> str:
         if _cfg.heygen_enabled else
         '<button class="btn btn-ghost" disabled title="Configure HEYGEN_API_KEY in Setup">HeyGen (not configured)</button>'
     )
+    remotion_btn = (
+        '<button class="btn btn-ghost" onclick="generateVideo(\'remotion\')" id="remotion-btn">&#127916; Post Card (Remotion)</button>'
+        if _cfg.remotion_enabled else
+        '<button class="btn btn-ghost" disabled title="Set REMOTION_ENABLED=true to enable">Remotion (not enabled)</button>'
+    )
 
     return _head("Create Content") + _nav("/create") + f"""
 <div class="container">
@@ -1342,6 +1347,7 @@ def _page_create(alert: str = "", alert_type: str = "success") -> str:
       <div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
         {veo3_btn}
         {heygen_btn}
+        {remotion_btn}
         <span id="vid-spinner" style="display:none"><span class="spinner" style="width:20px;height:20px;border-width:2px"></span></span>
         <span id="vid-status" style="font-size:13px;color:#888"></span>
       </div>
@@ -1594,17 +1600,20 @@ async function generateVideo(type) {{
   const status = document.getElementById("vid-status");
   const veo3Btn = document.getElementById("veo3-btn");
   const heygenBtn = document.getElementById("heygen-btn");
+  const remotionBtn = document.getElementById("remotion-btn");
 
   function _endJob() {{
     spinner.style.display = "none";
     if (veo3Btn) veo3Btn.disabled = false;
     if (heygenBtn) heygenBtn.disabled = false;
+    if (remotionBtn) remotionBtn.disabled = false;
   }}
 
   spinner.style.display = "inline-flex";
-  status.textContent = type === "veo3" ? "Submitting to VEO 3..." : "Submitting to HeyGen...";
+  status.textContent = type === "veo3" ? "Submitting to VEO 3..." : type === "remotion" ? "Rendering Post Card..." : "Submitting to HeyGen...";
   if (veo3Btn) veo3Btn.disabled = true;
   if (heygenBtn) heygenBtn.disabled = true;
+  if (remotionBtn) remotionBtn.disabled = true;
 
   try {{
     const resp = await fetch("/create/video/" + type, {{
@@ -1782,6 +1791,12 @@ def _start_video_job(job_id: str, video_type: str, text: str):
                 logger.info(f"VEO3 prompt: {veo3_prompt}")
                 veo3_client.make_video(veo3_prompt, fname, caption_text=veo3_caption)
                 url = _cfg.get_public_url(f"/media/{fname}")
+            elif video_type == "remotion":
+                from src import remotion_client
+                from config import config as _cfg
+                fname = f"remotion_{ts}.mp4"
+                remotion_client.render_post_card(text, fname)
+                url = _cfg.get_public_url(f"/media/{fname}")
             else:  # heygen
                 from src import heygen_client
                 from src.content_generator import post_to_spoken_script
@@ -1901,7 +1916,7 @@ class _Handler(BaseHTTPRequestHandler):
                 self._save_content_draft(body)
             elif p.path == "/create/image":
                 self._generate_ai_image(body)
-            elif p.path in ("/create/video/veo3", "/create/video/heygen"):
+            elif p.path in ("/create/video/veo3", "/create/video/heygen", "/create/video/remotion"):
                 self._start_video_generation(body, p.path)
             elif p.path == "/publish":
                 li = body.get("linkedin_text", [""])[0]
@@ -2437,7 +2452,7 @@ class _Handler(BaseHTTPRequestHandler):
     def _start_video_generation(self, body: dict, path: str):
         """Start a background video generation job and return a job_id for polling."""
         import secrets as _sec
-        video_type = "veo3" if path.endswith("veo3") else "heygen"
+        video_type = "veo3" if path.endswith("veo3") else "remotion" if path.endswith("remotion") else "heygen"
         text = body.get("prompt" if video_type == "veo3" else "script", [""])[0].strip()
         if not text:
             text = "AI automation and business intelligence services"
