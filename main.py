@@ -360,6 +360,8 @@ def cmd_run(text_only: bool, no_video: bool, force_theme: str | None = None, dra
 
 
 def cmd_start():
+    from src.user_store import bootstrap_admin
+    bootstrap_admin()
     from scheduler import start_scheduler
     if config.approval_required:
         from src.approver import start_approval_server

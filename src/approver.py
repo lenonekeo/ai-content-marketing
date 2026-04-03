@@ -734,7 +734,82 @@ def _page_dashboard(alert: str = "") -> str:
 </div></body></html>"""
 
 
-def _page_setup(alert: str = "", alert_type: str = "success") -> str:
+def _build_user_management_html(current_username: str) -> str:
+    """Build the admin-only user management card HTML."""
+    from src import user_store as _us
+    current_user = _us.get_by_username(current_username)
+    if not current_user or current_user.get("role") != "admin":
+        return ""
+
+    users = _us.get_all()
+    rows = ""
+    for u in users:
+        uname = _esc(u["username"])
+        email = _esc(u.get("email", ""))
+        role = _esc(u.get("role", "user"))
+        status = u.get("status", "active")
+        created = _esc(u.get("created_at", "")[:10])
+        is_self = u["username"] == current_username
+
+        status_badge = (
+            '<span style="color:#16a34a;font-weight:600">Active</span>' if status == "active"
+            else '<span style="color:#b45309;font-weight:600">Pending</span>'
+        )
+        role_badge = (
+            '<span style="color:#7c3aed;font-weight:600">Admin</span>' if role == "admin"
+            else '<span style="color:#64748b">User</span>'
+        )
+
+        approve_btn = ""
+        if status == "pending":
+            approve_btn = f'<form method="POST" action="/setup/users/approve" style="display:inline"><input type="hidden" name="username" value="{uname}"><button class="btn btn-ghost" style="font-size:12px;padding:4px 10px" type="submit">Approve</button></form> '
+
+        delete_btn = ""
+        if not is_self:
+            delete_btn = f'<form method="POST" action="/setup/users/delete" style="display:inline" onsubmit="return confirm(\'Delete user {uname}?\')"><input type="hidden" name="username" value="{uname}"><button class="btn btn-danger" style="font-size:12px;padding:4px 10px" type="submit">Delete</button></form>'
+
+        rows += f"""
+        <tr>
+          <td><strong>{uname}</strong>{"&nbsp;👤" if is_self else ""}</td>
+          <td style="color:#64748b">{email}</td>
+          <td>{role_badge}</td>
+          <td>{status_badge}</td>
+          <td style="color:#94a3b8">{created}</td>
+          <td>{approve_btn}{delete_btn}</td>
+        </tr>"""
+
+    if not rows:
+        rows = '<tr><td colspan="6" style="text-align:center;color:#94a3b8">No users yet</td></tr>'
+
+    pending_count = sum(1 for u in users if u.get("status") == "pending")
+    pending_note = f' <span style="background:#fef9e7;color:#b45309;border-radius:12px;padding:2px 8px;font-size:12px">{pending_count} pending</span>' if pending_count else ""
+
+    return f"""
+  <div class="card" style="margin-top:24px">
+    <div class="card-title">👥 User Management{pending_note}</div>
+    <p style="font-size:14px;color:#64748b;margin-bottom:16px">
+      Approve or remove users who have signed up. Pending accounts cannot log in until approved.
+    </p>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:14px">
+        <thead>
+          <tr style="border-bottom:2px solid var(--border)">
+            <th style="text-align:left;padding:8px 12px">Username</th>
+            <th style="text-align:left;padding:8px 12px">Email</th>
+            <th style="text-align:left;padding:8px 12px">Role</th>
+            <th style="text-align:left;padding:8px 12px">Status</th>
+            <th style="text-align:left;padding:8px 12px">Created</th>
+            <th style="text-align:left;padding:8px 12px">Actions</th>
+          </tr>
+        </thead>
+        <tbody>{rows}
+        </tbody>
+      </table>
+    </div>
+  </div>"""
+
+
+def _page_setup(alert: str = "", alert_type: str = "success", current_username: str = "") -> str:
     env = _read_env()
 
     def val(key, default=""):
@@ -744,6 +819,7 @@ def _page_setup(alert: str = "", alert_type: str = "success") -> str:
         return "••••••••" if env.get(key) else ""
 
     alert_html = f'<div class="alert alert-{alert_type}">{alert}</div>' if alert else ""
+    user_mgmt_html = _build_user_management_html(current_username)
 
     current_days = set(d.strip().lower() for d in env.get("POST_DAYS", "mon,wed,fri").split(","))
     days_html = " ".join(
@@ -1073,6 +1149,9 @@ def _page_setup(alert: str = "", alert_type: str = "success") -> str:
       </div>
     </div>
   </form>
+
+  {user_mgmt_html}
+
 <script>
 function checkPasswords() {{
   const np = document.getElementById("new_password").value;
@@ -1964,22 +2043,35 @@ import time as _time
 import hmac as _hmac
 import hashlib as _hashlib
 
-_sessions: dict = {}  # token -> expiry timestamp
-_SESSION_TTL = 86400  # 24 hours
+_sessions: dict = {}       # session_token -> {expiry, username}
+_reset_tokens: dict = {}   # reset_token -> {username, expiry}
+_SESSION_TTL = 86400       # 24 hours
+_RESET_TTL   = 3600        # 1 hour
 
 
-def _session_create() -> str:
+def _session_create(username: str = "") -> str:
     token = secrets.token_urlsafe(32)
-    _sessions[token] = _time.time() + _SESSION_TTL
+    _sessions[token] = {"expiry": _time.time() + _SESSION_TTL, "username": username}
     return token
+
+
+def _session_get_username(token: str | None) -> str:
+    """Return the username associated with a valid session, or ''."""
+    if not token:
+        return ""
+    entry = _sessions.get(token)
+    if not entry or _time.time() > entry.get("expiry", 0):
+        return ""
+    return entry.get("username", "")
 
 
 def _session_valid(token: str | None) -> bool:
     if not token:
         return False
-    exp = _sessions.get(token)
-    if not exp:
+    entry = _sessions.get(token)
+    if not entry:
         return False
+    exp = entry.get("expiry", 0) if isinstance(entry, dict) else entry
     if _time.time() > exp:
         _sessions.pop(token, None)
         return False
@@ -2000,18 +2092,65 @@ def _get_session_cookie(handler) -> str | None:
 
 
 def _password_valid(password: str) -> bool:
+    """Legacy check against APP_PASSWORD env var (used by _save_account only)."""
     from config import config as _cfg
     stored = _cfg.app_password
     if not stored:
-        return False  # No password set → deny all
+        return False
     return _hmac.compare_digest(
         _hashlib.sha256(password.encode()).hexdigest(),
         _hashlib.sha256(stored.encode()).hexdigest(),
     )
 
 
-def _page_login(error: str = "") -> str:
+def _reset_token_create(username: str) -> str:
+    token = secrets.token_urlsafe(32)
+    _reset_tokens[token] = {"username": username, "expiry": _time.time() + _RESET_TTL}
+    return token
+
+
+def _reset_token_consume(token: str) -> str | None:
+    """Return username if token is valid, then delete it."""
+    entry = _reset_tokens.get(token)
+    if not entry:
+        return None
+    if _time.time() > entry["expiry"]:
+        _reset_tokens.pop(token, None)
+        return None
+    _reset_tokens.pop(token, None)
+    return entry["username"]
+
+
+def _send_reset_email(email: str, username: str, reset_url: str):
+    """Send password reset email via SMTP. Silently skips if SMTP not configured."""
+    from config import config as _cfg
+    if not _cfg.smtp_enabled:
+        return
+    import smtplib
+    from email.mime.text import MIMEText
+    msg = MIMEText(
+        f"Hi {username},\n\nClick the link below to reset your MakOne BI password:\n\n"
+        f"{reset_url}\n\nThis link expires in 1 hour.\n\nIf you didn't request this, ignore this email.",
+        "plain",
+    )
+    msg["Subject"] = "MakOne BI — Password Reset"
+    msg["From"]    = _cfg.smtp_user
+    msg["To"]      = email
+    try:
+        with smtplib.SMTP(_cfg.smtp_host, _cfg.smtp_port) as s:
+            s.starttls()
+            s.login(_cfg.smtp_user, _cfg.smtp_password)
+            s.send_message(msg)
+        logger.info(f"Password reset email sent to {email}")
+    except Exception as e:
+        logger.error(f"Failed to send reset email: {e}")
+
+
+def _page_login(error: str = "", tab: str = "signin", success: str = "") -> str:
     err_html = f'<div style="background:rgba(220,38,38,0.12);color:#fca5a5;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:14px;border:1px solid rgba(220,38,38,0.3)">{_esc(error)}</div>' if error else ""
+    ok_html  = f'<div style="background:rgba(46,204,113,0.12);color:#4ade80;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:14px;border:1px solid rgba(46,204,113,0.3)">{_esc(success)}</div>' if success else ""
+    from config import config as _cfg
+    smtp_note = "" if _cfg.smtp_enabled else '<p style="font-size:11px;color:#475569;margin-top:8px">⚠ No email configured — your admin will share the reset link with you.</p>'
     return """<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MakOne BI — AI Content Marketing</title>
@@ -2021,77 +2160,69 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#07071a;color:#fff;min-h
 .glow{position:absolute;border-radius:50%;pointer-events:none;filter:blur(80px)}
 .hero{min-height:100vh;display:flex;flex-direction:row;align-items:stretch}
 .left{flex:1;display:flex;flex-direction:column;justify-content:center;padding:80px 60px;position:relative;overflow:hidden}
-.right{width:440px;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:40px;background:rgba(255,255,255,0.03);border-left:1px solid rgba(255,255,255,0.06)}
+.right{width:460px;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:40px;background:rgba(255,255,255,0.03);border-left:1px solid rgba(255,255,255,0.06)}
 .badge{display:inline-flex;align-items:center;gap:8px;background:rgba(79,142,247,0.12);border:1px solid rgba(79,142,247,0.3);border-radius:99px;padding:6px 16px;font-size:13px;color:#93c5fd;font-weight:600;margin-bottom:32px}
 .badge-dot{width:8px;height:8px;border-radius:50%;background:#4f8ef7;animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
-h1{font-size:58px;font-weight:900;line-height:1.1;margin-bottom:24px;letter-spacing:-1px}
+h1{font-size:56px;font-weight:900;line-height:1.1;margin-bottom:24px;letter-spacing:-1px}
 .grad{background:linear-gradient(90deg,#4f8ef7,#a855f7,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.subtitle{font-size:19px;color:#94a3b8;line-height:1.7;margin-bottom:48px;max-width:520px}
-.features{display:flex;flex-direction:column;gap:20px;margin-bottom:48px}
+.subtitle{font-size:18px;color:#94a3b8;line-height:1.7;margin-bottom:40px;max-width:520px}
+.features{display:flex;flex-direction:column;gap:18px;margin-bottom:40px}
 .feature{display:flex;align-items:flex-start;gap:16px}
-.feature-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
-.feature-text h3{font-size:15px;font-weight:700;color:#f1f5f9;margin-bottom:3px}
+.feature-icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
+.feature-text h3{font-size:14px;font-weight:700;color:#f1f5f9;margin-bottom:2px}
 .feature-text p{font-size:13px;color:#64748b;line-height:1.5}
-.stats{display:flex;gap:40px}
-.stat-val{font-size:32px;font-weight:900;background:linear-gradient(90deg,#4f8ef7,#a855f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.stat-label{font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-top:2px}
-.login-card{width:100%;max-width:360px}
-.login-card h2{font-size:22px;font-weight:800;margin-bottom:6px;color:#f1f5f9}
-.login-card p{font-size:14px;color:#64748b;margin-bottom:28px}
-.field-label{display:block;font-size:12px;font-weight:700;color:#94a3b8;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px}
-.login-input{width:100%;padding:12px 16px;background:rgba(255,255,255,0.05);border:1.5px solid rgba(255,255,255,0.1);border-radius:10px;font-size:15px;color:#fff;outline:none;transition:border-color .2s}
+.stats{display:flex;gap:36px}
+.stat-val{font-size:30px;font-weight:900;background:linear-gradient(90deg,#4f8ef7,#a855f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.stat-label{font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+/* Right panel */
+.auth-card{width:100%;max-width:380px}
+.tab-bar{display:flex;gap:4px;background:rgba(255,255,255,0.05);border-radius:10px;padding:4px;margin-bottom:24px}
+.tab-btn{flex:1;padding:8px 4px;border:none;background:transparent;color:#64748b;font-size:13px;font-weight:600;cursor:pointer;border-radius:7px;transition:all .2s}
+.tab-btn.active{background:rgba(79,142,247,0.2);color:#93c5fd}
+.tab-pane{display:none}.tab-pane.active{display:block}
+.auth-title{font-size:20px;font-weight:800;color:#f1f5f9;margin-bottom:4px}
+.auth-sub{font-size:13px;color:#64748b;margin-bottom:20px}
+.field-label{display:block;font-size:11px;font-weight:700;color:#94a3b8;letter-spacing:.5px;text-transform:uppercase;margin-bottom:7px}
+.login-input{width:100%;padding:11px 14px;background:rgba(255,255,255,0.05);border:1.5px solid rgba(255,255,255,0.1);border-radius:9px;font-size:14px;color:#fff;outline:none;transition:border-color .2s;margin-bottom:14px}
 .login-input:focus{border-color:#4f8ef7;background:rgba(79,142,247,0.08)}
 .login-input::placeholder{color:#475569}
-.login-btn{width:100%;padding:14px;background:linear-gradient(135deg,#4f8ef7,#a855f7);color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;margin-top:8px;transition:opacity .2s;letter-spacing:.3px}
+.login-btn{width:100%;padding:13px;background:linear-gradient(135deg,#4f8ef7,#a855f7);color:#fff;border:none;border-radius:9px;font-size:15px;font-weight:700;cursor:pointer;margin-top:4px;transition:opacity .2s}
 .login-btn:hover{opacity:.9}
-.divider{height:1px;background:rgba(255,255,255,0.06);margin:28px 0}
-.footer-note{font-size:12px;color:#334155;text-align:center}
-@media(max-width:900px){
+.divider{height:1px;background:rgba(255,255,255,0.06);margin:22px 0}
+.footer-note{font-size:11px;color:#334155;text-align:center}
+@media(max-width:960px){
   .hero{flex-direction:column}
-  .left{padding:60px 32px 40px}
-  h1{font-size:38px}
-  .right{width:100%;border-left:none;border-top:1px solid rgba(255,255,255,0.06);padding:40px 32px}
-  .stats{gap:24px}
+  .left{padding:56px 28px 36px}
+  h1{font-size:36px}
+  .right{width:100%;border-left:none;border-top:1px solid rgba(255,255,255,0.06);padding:36px 28px}
+  .stats{gap:20px}
 }
 </style>
 </head><body>
-
 <div class="hero">
 
   <!-- LEFT — Marketing -->
   <div class="left">
-    <!-- Glow orbs -->
     <div class="glow" style="width:500px;height:500px;top:-100px;left:-100px;background:rgba(79,142,247,0.12)"></div>
     <div class="glow" style="width:400px;height:400px;bottom:0;right:0;background:rgba(168,85,247,0.1)"></div>
 
     <div class="badge"><span class="badge-dot"></span>AI-Powered Platform</div>
-
     <h1>Content that<br>works while<br>you <span class="grad">sleep.</span></h1>
-
-    <p class="subtitle">MakOne BI writes, schedules, and publishes your social media content automatically — with AI-generated videos, smart approval flows, and multi-platform posting.</p>
+    <p class="subtitle">MakOne BI writes, schedules, and publishes your social media content automatically — with AI videos, smart approval flows, and multi-platform posting.</p>
 
     <div class="features">
       <div class="feature">
         <div class="feature-icon" style="background:rgba(79,142,247,0.15)">✍️</div>
-        <div class="feature-text">
-          <h3>AI Content Creation</h3>
-          <p>GPT-4 writes LinkedIn, Facebook & Instagram posts tailored to your brand voice in seconds.</p>
-        </div>
+        <div class="feature-text"><h3>AI Content Creation</h3><p>GPT-4 writes LinkedIn, Facebook & Instagram posts tailored to your brand voice.</p></div>
       </div>
       <div class="feature">
         <div class="feature-icon" style="background:rgba(168,85,247,0.15)">🎬</div>
-        <div class="feature-text">
-          <h3>Automated Video Generation</h3>
-          <p>HeyGen AI avatars, Google VEO 3 cinematic clips & Remotion branded videos — no editing needed.</p>
-        </div>
+        <div class="feature-text"><h3>Automated Video Generation</h3><p>HeyGen AI avatars, VEO 3 cinematic clips & Remotion branded videos — no editing needed.</p></div>
       </div>
       <div class="feature">
         <div class="feature-icon" style="background:rgba(6,182,212,0.15)">📅</div>
-        <div class="feature-text">
-          <h3>Smart Scheduling & Approval</h3>
-          <p>Review drafts, approve or edit, then publish automatically across all your platforms.</p>
-        </div>
+        <div class="feature-text"><h3>Smart Scheduling & Approval</h3><p>Review drafts, approve, then publish automatically across all your platforms.</p></div>
       </div>
     </div>
 
@@ -2102,32 +2233,108 @@ h1{font-size:58px;font-weight:900;line-height:1.1;margin-bottom:24px;letter-spac
     </div>
   </div>
 
-  <!-- RIGHT — Login -->
+  <!-- RIGHT — Auth tabs -->
   <div class="right">
-    <div class="login-card">
-      <div style="font-size:32px;margin-bottom:16px">🤖</div>
-      <h2>Welcome back</h2>
-      <p>Sign in to your MakOne BI dashboard</p>
+    <div class="auth-card">
+      <div style="font-size:30px;margin-bottom:14px">🤖</div>
 
-      """ + err_html + f"""
+      <div class="tab-bar">
+        <button class="tab-btn """ + ("active" if tab=="signin" else "") + f"""" onclick="showTab('signin')">Sign In</button>
+        <button class="tab-btn {"active" if tab=="signup" else ""}" onclick="showTab('signup')">Sign Up</button>
+        <button class="tab-btn {"active" if tab=="forgot" else ""}" onclick="showTab('forgot')">Reset Password</button>
+      </div>
 
-      <form method="POST" action="/login">
-        <div style="margin-bottom:16px">
+      {err_html}{ok_html}
+
+      <!-- SIGN IN -->
+      <div id="tab-signin" class="tab-pane {"active" if tab=="signin" else ""}">
+        <div class="auth-title">Welcome back</div>
+        <div class="auth-sub">Sign in to your MakOne BI dashboard</div>
+        <form method="POST" action="/login">
           <label class="field-label">Username</label>
           <input class="login-input" name="username" type="text" autocomplete="username" placeholder="Enter username" required>
-        </div>
-        <div style="margin-bottom:24px">
           <label class="field-label">Password</label>
           <input class="login-input" name="password" type="password" autocomplete="current-password" placeholder="Enter password" required>
-        </div>
-        <button class="login-btn" type="submit">Sign In →</button>
-      </form>
+          <button class="login-btn" type="submit">Sign In →</button>
+        </form>
+      </div>
+
+      <!-- SIGN UP -->
+      <div id="tab-signup" class="tab-pane {"active" if tab=="signup" else ""}">
+        <div class="auth-title">Create an account</div>
+        <div class="auth-sub">Request access to MakOne BI</div>
+        <form method="POST" action="/signup">
+          <label class="field-label">Username</label>
+          <input class="login-input" name="username" type="text" autocomplete="username" placeholder="Choose a username" required>
+          <label class="field-label">Email</label>
+          <input class="login-input" name="email" type="email" autocomplete="email" placeholder="your@email.com" required>
+          <label class="field-label">Password</label>
+          <input class="login-input" name="password" type="password" autocomplete="new-password" placeholder="Create a password" required>
+          <label class="field-label">Confirm Password</label>
+          <input class="login-input" name="confirm" type="password" autocomplete="new-password" placeholder="Repeat password" required>
+          <button class="login-btn" type="submit">Create Account →</button>
+        </form>
+      </div>
+
+      <!-- FORGOT PASSWORD -->
+      <div id="tab-forgot" class="tab-pane {"active" if tab=="forgot" else ""}">
+        <div class="auth-title">Reset your password</div>
+        <div class="auth-sub">Enter your email to receive a reset link</div>
+        <form method="POST" action="/forgot-password">
+          <label class="field-label">Email address</label>
+          <input class="login-input" name="email" type="email" autocomplete="email" placeholder="your@email.com" required>
+          <button class="login-btn" type="submit">Send Reset Link →</button>
+        </form>
+        {smtp_note}
+      </div>
 
       <div class="divider"></div>
       <div class="footer-note">app.makone-bi.com &nbsp;·&nbsp; MakOne BI © 2026</div>
     </div>
   </div>
 
+</div>
+<script>
+function showTab(t) {{
+  ['signin','signup','forgot'].forEach(function(id) {{
+    document.getElementById('tab-'+id).classList.toggle('active', id===t);
+  }});
+  document.querySelectorAll('.tab-btn').forEach(function(b,i) {{
+    b.classList.toggle('active', ['signin','signup','forgot'][i]===t);
+  }});
+}}
+</script>
+</body></html>"""
+
+
+def _page_reset_password(token: str, error: str = "") -> str:
+    err_html = f'<div style="background:rgba(220,38,38,0.12);color:#fca5a5;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:14px">{_esc(error)}</div>' if error else ""
+    return """<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reset Password — MakOne BI</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#07071a;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.card{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:40px;width:100%;max-width:400px}
+.field-label{display:block;font-size:11px;font-weight:700;color:#94a3b8;letter-spacing:.5px;text-transform:uppercase;margin-bottom:7px}
+input{width:100%;padding:11px 14px;background:rgba(255,255,255,0.05);border:1.5px solid rgba(255,255,255,0.1);border-radius:9px;font-size:14px;color:#fff;outline:none;margin-bottom:14px}
+input:focus{border-color:#4f8ef7}
+input::placeholder{color:#475569}
+button{width:100%;padding:13px;background:linear-gradient(135deg,#4f8ef7,#a855f7);color:#fff;border:none;border-radius:9px;font-size:15px;font-weight:700;cursor:pointer}
+</style></head><body>
+<div class="card">
+  <div style="font-size:28px;margin-bottom:16px">🔑</div>
+  <div style="font-size:20px;font-weight:800;margin-bottom:4px">Set new password</div>
+  <div style="font-size:13px;color:#64748b;margin-bottom:20px">Choose a strong password for your account.</div>
+""" + err_html + f"""
+  <form method="POST" action="/reset-password">
+    <input type="hidden" name="token" value="{_esc(token)}">
+    <label class="field-label">New Password</label>
+    <input type="password" name="password" placeholder="New password" required>
+    <label class="field-label">Confirm Password</label>
+    <input type="password" name="confirm" placeholder="Repeat password" required>
+    <button type="submit">Set Password →</button>
+  </form>
 </div>
 </body></html>"""
 
@@ -2304,6 +2511,13 @@ class _Handler(BaseHTTPRequestHandler):
             if p.path == "/login":
                 self._send(200, _page_login())
                 return
+            if p.path == "/reset-password":
+                token = qs.get("token", [""])[0]
+                if not token or token not in _reset_tokens:
+                    self._send(200, _page_login(error="Reset link is invalid or has expired.", tab="forgot"))
+                else:
+                    self._send(200, _page_reset_password(token))
+                return
             if p.path == "/logout":
                 _session_delete(_get_session_cookie(self))
                 self.send_response(302)
@@ -2320,7 +2534,8 @@ class _Handler(BaseHTTPRequestHandler):
             if p.path in ("/", ""):
                 self._send(200, _page_dashboard())
             elif p.path == "/setup":
-                self._send(200, _page_setup())
+                _cu = _session_get_username(_get_session_cookie(self))
+                self._send(200, _page_setup(current_username=_cu))
             elif p.path == "/influence":
                 self._send(200, _page_influence())
             elif p.path == "/calendar":
@@ -2381,19 +2596,103 @@ class _Handler(BaseHTTPRequestHandler):
             n = int(self.headers.get("Content-Length", 0))
             body = parse_qs(self.rfile.read(n).decode("utf-8", errors="replace"))
 
-            # Login handler — public
+            # Public POST routes — no auth required
             if p.path == "/login":
+                from src import user_store as _us
                 username = body.get("username", [""])[0].strip()
                 password = body.get("password", [""])[0]
-                from config import config as _auth_cfg
-                if username == _auth_cfg.app_username and _password_valid(password):
-                    session_token = _session_create()
+                user = _us.authenticate(username, password)
+                if user:
+                    session_token = _session_create(username=username)
                     self.send_response(302)
                     self._set_session_cookie(session_token)
                     self.send_header("Location", "/")
                     self.end_headers()
                 else:
-                    self._send(200, _page_login("Invalid username or password."))
+                    # Check if user exists but is pending
+                    u = _us.get_by_username(username)
+                    if u and u.get("status") == "pending":
+                        self._send(200, _page_login("Your account is pending approval by an admin."))
+                    else:
+                        self._send(200, _page_login("Invalid username or password."))
+                return
+
+            if p.path == "/signup":
+                from src import user_store as _us
+                username = body.get("username", [""])[0].strip()
+                email    = body.get("email",    [""])[0].strip()
+                password = body.get("password", [""])[0]
+                confirm  = body.get("confirm",  [""])[0]
+                if not username or not email or not password:
+                    self._send(200, _page_login("All fields are required.", tab="signup"))
+                    return
+                if password != confirm:
+                    self._send(200, _page_login("Passwords do not match.", tab="signup"))
+                    return
+                if len(password) < 6:
+                    self._send(200, _page_login("Password must be at least 6 characters.", tab="signup"))
+                    return
+                try:
+                    # First user becomes admin and is auto-approved
+                    is_first = _us.is_first_user()
+                    role   = "admin"  if is_first else "user"
+                    status = "active" if is_first else "pending"
+                    _us.create_user(username, email, password, role=role, status=status)
+                    if is_first:
+                        session_token = _session_create(username=username)
+                        self.send_response(302)
+                        self._set_session_cookie(session_token)
+                        self.send_header("Location", "/")
+                        self.end_headers()
+                    else:
+                        self._send(200, _page_login(
+                            success="Account created! An admin will review and approve your access.",
+                            tab="signin",
+                        ))
+                except ValueError as e:
+                    self._send(200, _page_login(str(e), tab="signup"))
+                return
+
+            if p.path == "/forgot-password":
+                from src import user_store as _us
+                from config import config as _cfg
+                email = body.get("email", [""])[0].strip()
+                user  = _us.get_by_email(email)
+                if user:
+                    token = _reset_token_create(user["username"])
+                    reset_url = _cfg.get_public_url(f"/reset-password?token={token}")
+                    _send_reset_email(email, user["username"], reset_url)
+                    if not _cfg.smtp_enabled:
+                        # No email — show link directly (admin use)
+                        self._send(200, _page_login(
+                            success=f"Reset link (no email configured — share manually): {reset_url}",
+                            tab="forgot",
+                        ))
+                        return
+                # Always show success to avoid email enumeration
+                self._send(200, _page_login(
+                    success="If that email is registered, a reset link has been sent.",
+                    tab="forgot",
+                ))
+                return
+
+            if p.path == "/reset-password":
+                from src import user_store as _us
+                token    = body.get("token",    [""])[0]
+                password = body.get("password", [""])[0]
+                confirm  = body.get("confirm",  [""])[0]
+                if password != confirm:
+                    self._send(200, _page_reset_password(token, "Passwords do not match."))
+                    return
+                if len(password) < 6:
+                    self._send(200, _page_reset_password(token, "Password must be at least 6 characters."))
+                    return
+                username = _reset_token_consume(token)
+                if not username:
+                    self._send(200, _page_login("Reset link is invalid or has expired.", tab="forgot"))
+                    return
+                _us.update_password(username, password)
+                self._send(200, _page_login(success="Password updated successfully. Please sign in.", tab="signin"))
                 return
 
             # All other POST routes require auth
@@ -2401,7 +2700,12 @@ class _Handler(BaseHTTPRequestHandler):
                 return
 
             if p.path == "/setup":
-                self._save_setup(body)
+                _cu = _session_get_username(_get_session_cookie(self))
+                self._save_setup(body, current_username=_cu)
+            elif p.path == "/setup/users/approve":
+                self._admin_approve_user(body)
+            elif p.path == "/setup/users/delete":
+                self._admin_delete_user(body)
             elif p.path == "/account":
                 self._save_account(body)
             elif p.path == "/influence":
@@ -2447,7 +2751,7 @@ class _Handler(BaseHTTPRequestHandler):
     # Admin handlers
     # ------------------------------------------------------------------
 
-    def _save_setup(self, body: dict):
+    def _save_setup(self, body: dict, current_username: str = ""):
         env = _read_env()
         updates = {}
 
@@ -2497,7 +2801,36 @@ class _Handler(BaseHTTPRequestHandler):
         else:
             alert_msg = "Settings saved successfully. Restart the service for changes to take effect."
 
-        self._send(200, _page_setup(alert=alert_msg, alert_type="success"))
+        self._send(200, _page_setup(alert=alert_msg, alert_type="success", current_username=current_username))
+
+    def _admin_approve_user(self, body: dict):
+        from src import user_store as _us
+        cu = _session_get_username(_get_session_cookie(self))
+        current_user = _us.get_by_username(cu)
+        if not current_user or current_user.get("role") != "admin":
+            self._send(403, self._simple_page("Forbidden", "Admin only.", "#e74c3c"))
+            return
+        username = body.get("username", [""])[0].strip()
+        if username:
+            _us.update_status(username, "active")
+            logger.info(f"Admin '{cu}' approved user '{username}'")
+        self._send(200, _page_setup(alert=f"User '{_esc(username)}' approved.", alert_type="success", current_username=cu))
+
+    def _admin_delete_user(self, body: dict):
+        from src import user_store as _us
+        cu = _session_get_username(_get_session_cookie(self))
+        current_user = _us.get_by_username(cu)
+        if not current_user or current_user.get("role") != "admin":
+            self._send(403, self._simple_page("Forbidden", "Admin only.", "#e74c3c"))
+            return
+        username = body.get("username", [""])[0].strip()
+        if username == cu:
+            self._send(200, _page_setup(alert="You cannot delete your own account.", alert_type="error", current_username=cu))
+            return
+        if username:
+            _us.delete_user(username)
+            logger.info(f"Admin '{cu}' deleted user '{username}'")
+        self._send(200, _page_setup(alert=f"User '{_esc(username)}' deleted.", alert_type="success", current_username=cu))
 
     def _save_account(self, body: dict):
         current_pw   = body.get("current_password", [""])[0]
