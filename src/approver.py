@@ -1926,35 +1926,123 @@ def _password_valid(password: str) -> bool:
 
 
 def _page_login(error: str = "") -> str:
-    err_html = f'<div style="background:#fee2e2;color:#dc2626;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:14px">{_esc(error)}</div>' if error else ""
-    return _head("Login") + f"""
-<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%)">
-  <div style="background:#fff;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.12);padding:48px 40px;width:100%;max-width:400px">
-    <div style="text-align:center;margin-bottom:32px">
-      <div style="font-size:36px;margin-bottom:8px">🤖</div>
-      <div style="font-size:22px;font-weight:800;color:#1e293b">MakOne BI</div>
-      <div style="font-size:14px;color:#64748b;margin-top:4px">AI Content Marketing</div>
+    err_html = f'<div style="background:rgba(220,38,38,0.12);color:#fca5a5;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:14px;border:1px solid rgba(220,38,38,0.3)">{_esc(error)}</div>' if error else ""
+    return """<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MakOne BI — AI Content Marketing</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#07071a;color:#fff;min-height:100vh;overflow-x:hidden}
+.glow{position:absolute;border-radius:50%;pointer-events:none;filter:blur(80px)}
+.hero{min-height:100vh;display:flex;flex-direction:row;align-items:stretch}
+.left{flex:1;display:flex;flex-direction:column;justify-content:center;padding:80px 60px;position:relative;overflow:hidden}
+.right{width:440px;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:40px;background:rgba(255,255,255,0.03);border-left:1px solid rgba(255,255,255,0.06)}
+.badge{display:inline-flex;align-items:center;gap:8px;background:rgba(79,142,247,0.12);border:1px solid rgba(79,142,247,0.3);border-radius:99px;padding:6px 16px;font-size:13px;color:#93c5fd;font-weight:600;margin-bottom:32px}
+.badge-dot{width:8px;height:8px;border-radius:50%;background:#4f8ef7;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+h1{font-size:58px;font-weight:900;line-height:1.1;margin-bottom:24px;letter-spacing:-1px}
+.grad{background:linear-gradient(90deg,#4f8ef7,#a855f7,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.subtitle{font-size:19px;color:#94a3b8;line-height:1.7;margin-bottom:48px;max-width:520px}
+.features{display:flex;flex-direction:column;gap:20px;margin-bottom:48px}
+.feature{display:flex;align-items:flex-start;gap:16px}
+.feature-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.feature-text h3{font-size:15px;font-weight:700;color:#f1f5f9;margin-bottom:3px}
+.feature-text p{font-size:13px;color:#64748b;line-height:1.5}
+.stats{display:flex;gap:40px}
+.stat-val{font-size:32px;font-weight:900;background:linear-gradient(90deg,#4f8ef7,#a855f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.stat-label{font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+.login-card{width:100%;max-width:360px}
+.login-card h2{font-size:22px;font-weight:800;margin-bottom:6px;color:#f1f5f9}
+.login-card p{font-size:14px;color:#64748b;margin-bottom:28px}
+.field-label{display:block;font-size:12px;font-weight:700;color:#94a3b8;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px}
+.login-input{width:100%;padding:12px 16px;background:rgba(255,255,255,0.05);border:1.5px solid rgba(255,255,255,0.1);border-radius:10px;font-size:15px;color:#fff;outline:none;transition:border-color .2s}
+.login-input:focus{border-color:#4f8ef7;background:rgba(79,142,247,0.08)}
+.login-input::placeholder{color:#475569}
+.login-btn{width:100%;padding:14px;background:linear-gradient(135deg,#4f8ef7,#a855f7);color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;margin-top:8px;transition:opacity .2s;letter-spacing:.3px}
+.login-btn:hover{opacity:.9}
+.divider{height:1px;background:rgba(255,255,255,0.06);margin:28px 0}
+.footer-note{font-size:12px;color:#334155;text-align:center}
+@media(max-width:900px){
+  .hero{flex-direction:column}
+  .left{padding:60px 32px 40px}
+  h1{font-size:38px}
+  .right{width:100%;border-left:none;border-top:1px solid rgba(255,255,255,0.06);padding:40px 32px}
+  .stats{gap:24px}
+}
+</style>
+</head><body>
+
+<div class="hero">
+
+  <!-- LEFT — Marketing -->
+  <div class="left">
+    <!-- Glow orbs -->
+    <div class="glow" style="width:500px;height:500px;top:-100px;left:-100px;background:rgba(79,142,247,0.12)"></div>
+    <div class="glow" style="width:400px;height:400px;bottom:0;right:0;background:rgba(168,85,247,0.1)"></div>
+
+    <div class="badge"><span class="badge-dot"></span>AI-Powered Platform</div>
+
+    <h1>Content that<br>works while<br>you <span class="grad">sleep.</span></h1>
+
+    <p class="subtitle">MakOne BI writes, schedules, and publishes your social media content automatically — with AI-generated videos, smart approval flows, and multi-platform posting.</p>
+
+    <div class="features">
+      <div class="feature">
+        <div class="feature-icon" style="background:rgba(79,142,247,0.15)">✍️</div>
+        <div class="feature-text">
+          <h3>AI Content Creation</h3>
+          <p>GPT-4 writes LinkedIn, Facebook & Instagram posts tailored to your brand voice in seconds.</p>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon" style="background:rgba(168,85,247,0.15)">🎬</div>
+        <div class="feature-text">
+          <h3>Automated Video Generation</h3>
+          <p>HeyGen AI avatars, Google VEO 3 cinematic clips & Remotion branded videos — no editing needed.</p>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon" style="background:rgba(6,182,212,0.15)">📅</div>
+        <div class="feature-text">
+          <h3>Smart Scheduling & Approval</h3>
+          <p>Review drafts, approve or edit, then publish automatically across all your platforms.</p>
+        </div>
+      </div>
     </div>
-    {err_html}
-    <form method="POST" action="/login">
-      <div style="margin-bottom:16px">
-        <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Username</label>
-        <input name="username" type="text" autocomplete="username" required
-          style="width:100%;box-sizing:border-box;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:15px;outline:none"
-          onfocus="this.style.borderColor='#4f8ef7'" onblur="this.style.borderColor='#e2e8f0'">
-      </div>
-      <div style="margin-bottom:24px">
-        <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Password</label>
-        <input name="password" type="password" autocomplete="current-password" required
-          style="width:100%;box-sizing:border-box;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:15px;outline:none"
-          onfocus="this.style.borderColor='#4f8ef7'" onblur="this.style.borderColor='#e2e8f0'">
-      </div>
-      <button type="submit"
-        style="width:100%;padding:12px;background:linear-gradient(135deg,#4f8ef7,#a855f7);color:#fff;border:none;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer">
-        Sign In
-      </button>
-    </form>
+
+    <div class="stats">
+      <div><div class="stat-val">5+</div><div class="stat-label">Platforms</div></div>
+      <div><div class="stat-val">24/7</div><div class="stat-label">Automated</div></div>
+      <div><div class="stat-val">AI</div><div class="stat-label">Powered</div></div>
+    </div>
   </div>
+
+  <!-- RIGHT — Login -->
+  <div class="right">
+    <div class="login-card">
+      <div style="font-size:32px;margin-bottom:16px">🤖</div>
+      <h2>Welcome back</h2>
+      <p>Sign in to your MakOne BI dashboard</p>
+
+      """ + err_html + f"""
+
+      <form method="POST" action="/login">
+        <div style="margin-bottom:16px">
+          <label class="field-label">Username</label>
+          <input class="login-input" name="username" type="text" autocomplete="username" placeholder="Enter username" required>
+        </div>
+        <div style="margin-bottom:24px">
+          <label class="field-label">Password</label>
+          <input class="login-input" name="password" type="password" autocomplete="current-password" placeholder="Enter password" required>
+        </div>
+        <button class="login-btn" type="submit">Sign In →</button>
+      </form>
+
+      <div class="divider"></div>
+      <div class="footer-note">app.makone-bi.com &nbsp;·&nbsp; MakOne BI © 2026</div>
+    </div>
+  </div>
+
 </div>
 </body></html>"""
 
