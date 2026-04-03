@@ -106,6 +106,68 @@ def render_outro(filename: str) -> str:
     return _render("Outro", props, output_path, timeout=180)
 
 
+def render_composition(composition_id: str, filename: str, props: dict | None = None, timeout: int = 600) -> str:
+    """
+    Render any composition by ID with arbitrary props.
+    Used for ProductLaunch, AvatarShowcase, and future compositions.
+    Returns the local mp4 path.
+    """
+    output_path = os.path.join(config.downloads_dir, filename)
+    return _render(composition_id, props or {}, output_path, timeout=timeout)
+
+
+def capture_screenshots(base_url: str = "https://app.makone-bi.com") -> bool:
+    """
+    Run capture_screenshots.js via Node to take fresh app screenshots.
+    Saves dashboard.png and create.png to remotion/public/.
+    Returns True on success, False if Node/Puppeteer unavailable.
+    """
+    script = os.path.join(_REMOTION_DIR, "capture_screenshots.js")
+    if not os.path.exists(script):
+        logger.warning("capture_screenshots.js not found — skipping screenshot capture")
+        return False
+    public_dir = os.path.join(_REMOTION_DIR, "public")
+    os.makedirs(public_dir, exist_ok=True)
+    try:
+        result = subprocess.run(
+            ["node", script, base_url, public_dir],
+            cwd=_REMOTION_DIR,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if result.returncode != 0:
+            logger.warning(f"Screenshot capture failed (exit {result.returncode}): {result.stderr[-600:]}")
+            return False
+        logger.info(f"Screenshots captured:\n{result.stdout.strip()}")
+        return True
+    except FileNotFoundError:
+        logger.warning("node not found — skipping screenshot capture")
+        return False
+    except Exception as e:
+        logger.warning(f"Screenshot capture error: {e}")
+        return False
+
+
+def download_heygen_to_public(heygen_url: str) -> str:
+    """
+    Download a HeyGen CDN video URL and save it as remotion/public/heygen_latest.mp4.
+    Returns the local path.
+    """
+    import requests as _req
+    public_dir = os.path.join(_REMOTION_DIR, "public")
+    os.makedirs(public_dir, exist_ok=True)
+    dest = os.path.join(public_dir, "heygen_latest.mp4")
+    logger.info(f"Downloading HeyGen video → {dest}")
+    resp = _req.get(heygen_url, stream=True, timeout=180)
+    resp.raise_for_status()
+    with open(dest, "wb") as f:
+        for chunk in resp.iter_content(chunk_size=8192):
+            f.write(chunk)
+    logger.info(f"HeyGen video saved to {dest} ({os.path.getsize(dest) // 1024} KB)")
+    return dest
+
+
 def stitch_intro_outro(main_video_path: str) -> str | None:
     """
     Render intro + outro and stitch them around the main video using ffmpeg.

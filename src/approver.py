@@ -1244,7 +1244,19 @@ def _page_create(alert: str = "", alert_type: str = "success") -> str:
         '<button class="btn btn-ghost" disabled title="Configure HEYGEN_API_KEY in Setup">HeyGen (not configured)</button>'
     )
     remotion_btn = (
-        '<button class="btn btn-ghost" onclick="generateVideo(\'remotion\')" id="remotion-btn">&#127916; Post Card (Remotion)</button>'
+        '''<div class="remotion-dropdown" style="position:relative;display:inline-block">
+          <button class="btn btn-ghost" onclick="toggleRemotionMenu(event)" id="remotion-btn" style="display:flex;align-items:center;gap:6px">
+            &#127916; Remotion <span style="font-size:10px">&#9660;</span>
+          </button>
+          <div id="remotion-menu" style="display:none;position:absolute;top:110%;left:0;background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.12);z-index:999;min-width:220px;overflow:hidden">
+            <div style="padding:8px 12px;font-size:11px;font-weight:700;color:#94a3b8;letter-spacing:1px;border-bottom:1px solid #f1f5f9">PICK COMPOSITION</div>
+            <div onclick="generateVideo(\'remotion\',\'PostCard\')"       style="padding:10px 16px;cursor:pointer;font-size:13px;font-weight:600" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'">&#127916; Post Card <span style="font-size:11px;color:#94a3b8;font-weight:400">— animated post (1080×1080)</span></div>
+            <div onclick="generateVideo(\'remotion\',\'Intro\')"           style="padding:10px 16px;cursor:pointer;font-size:13px;font-weight:600" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'">&#9654; YouTube Intro <span style="font-size:11px;color:#94a3b8;font-weight:400">— branded 3s clip</span></div>
+            <div onclick="generateVideo(\'remotion\',\'Outro\')"           style="padding:10px 16px;cursor:pointer;font-size:13px;font-weight:600" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'">&#127937; YouTube Outro <span style="font-size:11px;color:#94a3b8;font-weight:400">— CTA 6s clip</span></div>
+            <div onclick="generateVideo(\'remotion\',\'ProductLaunch\')"   style="padding:10px 16px;cursor:pointer;font-size:13px;font-weight:600" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'">&#128640; Product Launch <span style="font-size:11px;color:#94a3b8;font-weight:400">— full 25s video</span></div>
+            <div onclick="generateVideo(\'remotion\',\'AvatarShowcase\')"  style="padding:10px 16px;cursor:pointer;font-size:13px;font-weight:600;border-top:1px solid #f1f5f9" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'">&#129302; Avatar Showcase <span style="font-size:11px;color:#94a3b8;font-weight:400">— avatar + app (14s)</span></div>
+          </div>
+        </div>'''
         if _cfg.remotion_enabled else
         '<button class="btn btn-ghost" disabled title="Set REMOTION_ENABLED=true to enable">Remotion (not enabled)</button>'
     )
@@ -1374,90 +1386,9 @@ def _page_create(alert: str = "", alert_type: str = "success") -> str:
             <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">AI CLONE (HEYGEN)</div>
             <video id="prev-heygen" controls style="max-width:100%;border-radius:8px;max-height:220px"></video>
           </div>
-        </div>
-      </div>
-      <div id="media-previews" style="display:none;margin-top:20px;border-top:1px solid #eee;padding-top:16px">
-        <div style="font-weight:600;font-size:14px;margin-bottom:12px;color:#333">Generated Media</div>
-        <div style="display:flex;gap:16px;flex-wrap:wrap">
-          <div id="prev-image-wrap" style="display:none;flex:1;min-width:220px">
-            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">AI IMAGE</div>
-            <img id="prev-image" src="" style="max-width:100%;border-radius:8px;border:1px solid #e0e0e0">
-          </div>
-          <div id="prev-veo3-wrap" style="display:none;flex:1;min-width:220px">
-            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">VEO3 VIDEO</div>
-            <video id="prev-veo3" controls style="max-width:100%;border-radius:8px;max-height:220px"></video>
-          </div>
-          <div id="prev-heygen-wrap" style="display:none;flex:1;min-width:220px">
-            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">AI CLONE (HEYGEN)</div>
-            <video id="prev-heygen" controls style="max-width:100%;border-radius:8px;max-height:220px"></video>
-          </div>
-        </div>
-      </div>
-      <div id="media-previews" style="display:none;margin-top:20px;border-top:1px solid #eee;padding-top:16px">
-        <div style="font-weight:600;font-size:14px;margin-bottom:12px;color:#333">Generated Media</div>
-        <div style="display:flex;gap:16px;flex-wrap:wrap">
-          <div id="prev-image-wrap" style="display:none;flex:1;min-width:220px">
-            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">AI IMAGE</div>
-            <img id="prev-image" src="" style="max-width:100%;border-radius:8px;border:1px solid #e0e0e0">
-          </div>
-          <div id="prev-veo3-wrap" style="display:none;flex:1;min-width:220px">
-            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">VEO3 VIDEO</div>
-            <video id="prev-veo3" controls style="max-width:100%;border-radius:8px;max-height:220px"></video>
-          </div>
-          <div id="prev-heygen-wrap" style="display:none;flex:1;min-width:220px">
-            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">AI CLONE (HEYGEN)</div>
-            <video id="prev-heygen" controls style="max-width:100%;border-radius:8px;max-height:220px"></video>
-          </div>
-        </div>
-      </div>
-      <div id="media-previews" style="display:none;margin-top:20px;border-top:1px solid #eee;padding-top:16px">
-        <div style="font-weight:600;font-size:14px;margin-bottom:12px;color:#333">Generated Media</div>
-        <div style="display:flex;gap:16px;flex-wrap:wrap">
-          <div id="prev-image-wrap" style="display:none;flex:1;min-width:220px">
-            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">AI IMAGE</div>
-            <img id="prev-image" src="" style="max-width:100%;border-radius:8px;border:1px solid #e0e0e0">
-          </div>
-          <div id="prev-veo3-wrap" style="display:none;flex:1;min-width:220px">
-            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">VEO3 VIDEO</div>
-            <video id="prev-veo3" controls style="max-width:100%;border-radius:8px;max-height:220px"></video>
-          </div>
-          <div id="prev-heygen-wrap" style="display:none;flex:1;min-width:220px">
-            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">AI CLONE (HEYGEN)</div>
-            <video id="prev-heygen" controls style="max-width:100%;border-radius:8px;max-height:220px"></video>
-          </div>
-        </div>
-      </div>
-      <div id="media-previews" style="display:none;margin-top:20px;border-top:1px solid #eee;padding-top:16px">
-        <div style="font-weight:600;font-size:14px;margin-bottom:12px;color:#333">Generated Media</div>
-        <div style="display:flex;gap:16px;flex-wrap:wrap">
-          <div id="prev-image-wrap" style="display:none;flex:1;min-width:220px">
-            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">AI IMAGE</div>
-            <img id="prev-image" src="" style="max-width:100%;border-radius:8px;border:1px solid #e0e0e0">
-          </div>
-          <div id="prev-veo3-wrap" style="display:none;flex:1;min-width:220px">
-            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">VEO3 VIDEO</div>
-            <video id="prev-veo3" controls style="max-width:100%;border-radius:8px;max-height:220px"></video>
-          </div>
-          <div id="prev-heygen-wrap" style="display:none;flex:1;min-width:220px">
-            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">AI CLONE (HEYGEN)</div>
-            <video id="prev-heygen" controls style="max-width:100%;border-radius:8px;max-height:220px"></video>
-          </div>
-        </div>
-      </div>
-      <div id="media-previews" style="display:none;margin-top:20px;border-top:1px solid #eee;padding-top:16px">
-        <div style="font-weight:600;font-size:14px;margin-bottom:12px;color:#333">Generated Media</div>
-        <div style="display:flex;gap:16px;flex-wrap:wrap">
-          <div id="prev-image-wrap" style="display:none;flex:1;min-width:220px">
-            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">AI IMAGE</div>
-            <img id="prev-image" src="" style="max-width:100%;border-radius:8px;border:1px solid #e0e0e0">
-          </div>
-          <div id="prev-veo3-wrap" style="display:none;flex:1;min-width:220px">
-            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">VEO3 VIDEO</div>
-            <video id="prev-veo3" controls style="max-width:100%;border-radius:8px;max-height:220px"></video>
-          </div>
-          <div id="prev-heygen-wrap" style="display:none;flex:1;min-width:220px">
-            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px">AI CLONE (HEYGEN)</div>
-            <video id="prev-heygen" controls style="max-width:100%;border-radius:8px;max-height:220px"></video>
+          <div id="prev-remotion-wrap" style="display:none;flex:1;min-width:220px">
+            <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:6px" id="prev-remotion-label">🎬 REMOTION</div>
+            <video id="prev-remotion" controls style="max-width:100%;border-radius:8px;max-height:220px"></video>
           </div>
         </div>
       </div>
@@ -1709,7 +1640,21 @@ function toggleSchedule() {{
   document.getElementById("sched-picker").style.display = later ? "block" : "none";
 }}
 
-async function generateVideo(type) {{
+function toggleRemotionMenu(event) {{
+  event.stopPropagation();
+  const menu = document.getElementById("remotion-menu");
+  menu.style.display = menu.style.display === "none" ? "block" : "none";
+  document.addEventListener("click", function _close() {{
+    menu.style.display = "none";
+    document.removeEventListener("click", _close);
+  }}, {{once: true}});
+}}
+
+async function generateVideo(type, composition) {{
+  // Close remotion dropdown if open
+  const rmenu = document.getElementById("remotion-menu");
+  if (rmenu) rmenu.style.display = "none";
+
   const lastMsg = messages.length > 0 ? messages[messages.length-1].content : "";
   const chatInput = document.getElementById("chat-input").value.trim();
   const script = lastMsg || chatInput || "AI automation and business intelligence services";
@@ -1727,16 +1672,32 @@ async function generateVideo(type) {{
   }}
 
   spinner.style.display = "inline-flex";
-  status.textContent = type === "veo3" ? "Submitting to VEO 3..." : type === "remotion" ? "Rendering Post Card..." : "Submitting to HeyGen...";
+  if (type === "veo3") {{
+    status.textContent = "Submitting to VEO 3...";
+  }} else if (type === "remotion" && composition === "AvatarShowcase") {{
+    status.textContent = "🤖 Starting Avatar Showcase pipeline (HeyGen + screenshots + render — keep this page open)...";
+  }} else if (type === "remotion") {{
+    status.textContent = "🎬 Rendering " + (composition || "PostCard") + "...";
+  }} else {{
+    status.textContent = "Submitting to HeyGen...";
+  }}
   if (veo3Btn) veo3Btn.disabled = true;
   if (heygenBtn) heygenBtn.disabled = true;
   if (remotionBtn) remotionBtn.disabled = true;
 
   try {{
+    let bodyStr;
+    if (type === "veo3") {{
+      bodyStr = "prompt=" + encodeURIComponent(script);
+    }} else if (type === "remotion") {{
+      bodyStr = "script=" + encodeURIComponent(script) + "&composition=" + encodeURIComponent(composition || "PostCard");
+    }} else {{
+      bodyStr = "script=" + encodeURIComponent(script);
+    }}
     const resp = await fetch("/create/video/" + type, {{
       method: "POST",
       headers: {{"Content-Type": "application/x-www-form-urlencoded"}},
-      body: (type === "veo3" ? "prompt=" : "script=") + encodeURIComponent(script)
+      body: bodyStr
     }});
     const data = await resp.json();
     if (data.error) {{
@@ -1745,7 +1706,13 @@ async function generateVideo(type) {{
       return;
     }}
     const jobId = data.job_id;
-    status.textContent = type === "veo3" ? "⏳ VEO 3 generating (~2 min)..." : "⏳ HeyGen generating avatar (5–20 min — keep this page open)...";
+    if (type === "veo3") {{
+      status.textContent = "⏳ VEO 3 generating (~2 min)...";
+    }} else if (type === "remotion") {{
+      status.textContent = "⏳ Rendering " + (composition || "PostCard") + " (1–3 min)...";
+    }} else {{
+      status.textContent = "⏳ HeyGen generating avatar (5–20 min — keep this page open)...";
+    }}
     // Poll for completion — spinner stays visible until done/error
     let pollCount = 0;
     const poll = setInterval(async () => {{
@@ -1758,23 +1725,15 @@ async function generateVideo(type) {{
           document.getElementById("video_url").value = sd.url;
           previewVideo();
           status.textContent = "✓ Video ready! URL filled below.";
-          var vLabel = type === "veo3" ? "VEO3 VIDEO" : "AI CLONE (HEYGEN)";
-          document.getElementById("prev-video-label").textContent = vLabel;
-          document.getElementById("prev-video").src = sd.url;
-          document.getElementById("prev-video-wrap").style.display = "block";
-          document.getElementById("media-previews").style.display = "block";
           document.getElementById("media-previews").style.display = "block";
           if (type === "veo3") {{
             document.getElementById("prev-veo3").src = sd.url;
             document.getElementById("prev-veo3-wrap").style.display = "block";
-          }} else {{
-            document.getElementById("prev-heygen").src = sd.url;
-            document.getElementById("prev-heygen-wrap").style.display = "block";
-          }}
-          document.getElementById("media-previews").style.display = "block";
-          if (type === "veo3") {{
-            document.getElementById("prev-veo3").src = sd.url;
-            document.getElementById("prev-veo3-wrap").style.display = "block";
+          }} else if (type === "remotion") {{
+            const compLabel = composition || "PostCard";
+            document.getElementById("prev-remotion-label").textContent = "🎬 REMOTION — " + compLabel.toUpperCase();
+            document.getElementById("prev-remotion").src = sd.url;
+            document.getElementById("prev-remotion-wrap").style.display = "block";
           }} else {{
             document.getElementById("prev-heygen").src = sd.url;
             document.getElementById("prev-heygen-wrap").style.display = "block";
@@ -1798,17 +1757,23 @@ async function generateVideo(type) {{
               hint = " → Go to Setup and verify HEYGEN_API_KEY, HEYGEN_AVATAR_ID, and HEYGEN_VOICE_ID.";
             }}
           }} else if (type === "veo3") {{
-            if (errMsg.includes("401") || errMsg.toLowerCase().includes("api key")) {{
-              hint = " → Check your GOOGLE_API_KEY in Setup.";
-            }} else {{
-              hint = " → Check your GOOGLE_API_KEY in Setup.";
-            }}
+            hint = " → Check your GOOGLE_API_KEY in Setup.";
+          }} else if (type === "remotion") {{
+            hint = " → Check server logs for render error details.";
           }}
           status.innerHTML = '<span style="color:#e74c3c">✗ Error: ' + errMsg + '</span><br><span style="color:#e67e22;font-size:12px">' + hint + '</span>';
           _endJob();
         }} else {{
           const dots = ".".repeat((pollCount % 3) + 1);
-          status.textContent = (type === "veo3" ? "⏳ VEO 3 generating" : "⏳ HeyGen generating avatar") + dots;
+          if (sd.message) {{
+            status.textContent = "⏳ " + sd.message;
+          }} else if (type === "veo3") {{
+            status.textContent = "⏳ VEO 3 generating" + dots;
+          }} else if (type === "remotion") {{
+            status.textContent = "⏳ Rendering " + (composition || "PostCard") + dots;
+          }} else {{
+            status.textContent = "⏳ HeyGen generating avatar" + dots;
+          }}
         }}
       }} catch(e) {{ /* ignore transient poll errors */ }}
     }}, 8000);
@@ -1854,7 +1819,7 @@ _publish_callback = None  # set by start_approval_server
 _video_jobs: dict = {}
 
 
-def _start_video_job(job_id: str, video_type: str, text: str):
+def _start_video_job(job_id: str, video_type: str, text: str, composition: str = "PostCard"):
     """Run video generation in a background thread."""
     import threading
     import datetime as _dtmod
@@ -1877,10 +1842,39 @@ def _start_video_job(job_id: str, video_type: str, text: str):
                 veo3_client.make_video(veo3_prompt, fname, caption_text=veo3_caption)
                 url = _cfg.get_public_url(f"/media/{fname}")
             elif video_type == "remotion":
-                from src import remotion_client
+                from src import remotion_client, heygen_client
+                from src.content_generator import post_to_spoken_script
                 from config import config as _cfg
-                fname = f"remotion_{ts}.mp4"
-                remotion_client.render_post_card(text, fname)
+                comp = composition or "PostCard"
+                fname = f"remotion_{comp}_{ts}.mp4"
+                logger.info(f"Remotion render: composition={comp}, text preview={text[:80]}")
+
+                if comp == "AvatarShowcase":
+                    # Step 1 — Generate HeyGen avatar video with the chat script
+                    _video_jobs[job_id]["message"] = "Step 1/3: Generating HeyGen avatar video (5–20 min)..."
+                    heygen_client.config.heygen_api_key = _os.getenv("HEYGEN_API_KEY", "")
+                    heygen_client.config.heygen_avatar_id = _os.getenv("HEYGEN_AVATAR_ID", "")
+                    heygen_client.config.heygen_voice_id = _os.getenv("HEYGEN_VOICE_ID", "")
+                    spoken_script = post_to_spoken_script(text)
+                    logger.info(f"AvatarShowcase HeyGen script ({len(spoken_script)} chars): {spoken_script[:120]}...")
+                    heygen_url = heygen_client.wait_for_video(heygen_client.create_video(spoken_script))
+
+                    # Step 2 — Download avatar video + capture fresh screenshots
+                    _video_jobs[job_id]["message"] = "Step 2/3: Downloading avatar video & capturing screenshots..."
+                    remotion_client.download_heygen_to_public(heygen_url)
+                    remotion_client.capture_screenshots()
+
+                    # Step 3 — Render AvatarShowcase with Remotion
+                    _video_jobs[job_id]["message"] = "Step 3/3: Rendering AvatarShowcase with Remotion (1–2 min)..."
+                    remotion_client.render_composition(comp, fname, props={})
+                elif comp == "PostCard":
+                    remotion_client.render_post_card(text, fname)
+                elif comp == "Intro":
+                    remotion_client.render_intro(fname)
+                elif comp == "Outro":
+                    remotion_client.render_outro(fname)
+                else:
+                    remotion_client.render_composition(comp, fname, props={})
                 url = _cfg.get_public_url(f"/media/{fname}")
             else:  # heygen
                 from src import heygen_client
@@ -2556,8 +2550,9 @@ class _Handler(BaseHTTPRequestHandler):
         text = body.get("prompt" if video_type == "veo3" else "script", [""])[0].strip()
         if not text:
             text = "AI automation and business intelligence services"
+        composition = body.get("composition", ["PostCard"])[0].strip() if video_type == "remotion" else "PostCard"
         job_id = _sec.token_urlsafe(12)
-        _start_video_job(job_id, video_type, text)
+        _start_video_job(job_id, video_type, text, composition)
         self._send_json({"job_id": job_id})
 
     # ------------------------------------------------------------------
