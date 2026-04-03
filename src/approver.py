@@ -951,8 +951,61 @@ def _page_setup(alert: str = "", alert_type: str = "success") -> str:
       <a href="/" class="btn btn-ghost">Cancel</a>
     </div>
   </form>
-</div>
+
+  <!-- Login & Access — separate form with password confirmation -->
+  <form method="POST" action="/account" id="account-form">
+    <div class="card" style="margin-top:24px">
+      <div class="card-title">🔐 Login &amp; Access</div>
+      <p style="font-size:14px;color:#64748b;margin-bottom:20px">
+        Change the username and password used to access this app.
+        You must enter your current password to save changes.
+      </p>
+      <div class="grid-2">
+        <div class="field">
+          <label>Username</label>
+          <input type="text" name="username" value="{val("APP_USERNAME", "admin")}" autocomplete="username">
+        </div>
+        <div class="field">
+          <label>Current Password <span class="hint">required to save</span></label>
+          <input type="password" name="current_password" placeholder="Enter current password" autocomplete="current-password">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label>New Password <span class="hint">leave blank to keep current</span></label>
+          <input type="password" name="new_password" id="new_password" placeholder="New password" autocomplete="new-password"
+            oninput="checkPasswords()">
+        </div>
+        <div class="field">
+          <label>Confirm New Password</label>
+          <input type="password" name="confirm_password" id="confirm_password" placeholder="Repeat new password" autocomplete="new-password"
+            oninput="checkPasswords()">
+          <span id="pw-match" style="font-size:12px;margin-top:4px;display:block"></span>
+        </div>
+      </div>
+      <div class="section-actions" style="margin-top:8px">
+        <button type="submit" class="btn btn-primary" id="account-btn">Update Login</button>
+      </div>
+    </div>
+  </form>
 <script>
+function checkPasswords() {{
+  const np = document.getElementById("new_password").value;
+  const cp = document.getElementById("confirm_password").value;
+  const msg = document.getElementById("pw-match");
+  const btn = document.getElementById("account-btn");
+  if (!np && !cp) {{ msg.textContent = ""; return; }}
+  if (np === cp) {{
+    msg.textContent = "✓ Passwords match";
+    msg.style.color = "#16a34a";
+    btn.disabled = false;
+  }} else {{
+    msg.textContent = "✗ Passwords do not match";
+    msg.style.color = "#dc2626";
+    btn.disabled = true;
+  }}
+}}
+
 function _avCard(id, name, imgUrl) {{
   const img = imgUrl
     ? `<img src="${{imgUrl}}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;margin-bottom:6px;display:block">`
@@ -2022,6 +2075,7 @@ _SENSITIVE_KEYS = {
     "OPENAI_API_KEY", "HEYGEN_API_KEY", "GOOGLE_API_KEY",
     "LINKEDIN_ACCESS_TOKEN", "FACEBOOK_ACCESS_TOKEN",
     "INSTAGRAM_ACCESS_TOKEN", "SMTP_PASSWORD",
+    "APP_PASSWORD",
 }
 
 _SETUP_KEYS = {
@@ -2175,6 +2229,8 @@ class _Handler(BaseHTTPRequestHandler):
 
             if p.path == "/setup":
                 self._save_setup(body)
+            elif p.path == "/account":
+                self._save_account(body)
             elif p.path == "/influence":
                 self._save_influence(body)
             elif p.path == "/create/chat":
@@ -2269,6 +2325,54 @@ class _Handler(BaseHTTPRequestHandler):
             alert_msg = "Settings saved successfully. Restart the service for changes to take effect."
 
         self._send(200, _page_setup(alert=alert_msg, alert_type="success"))
+
+    def _save_account(self, body: dict):
+        current_pw   = body.get("current_password", [""])[0]
+        new_username = body.get("username", [""])[0].strip()
+        new_password = body.get("new_password", [""])[0]
+        confirm_pw   = body.get("confirm_password", [""])[0]
+
+        # Verify current password
+        if not _password_valid(current_pw):
+            self._send(200, _page_setup(
+                alert="Incorrect current password — no changes saved.",
+                alert_type="error",
+            ))
+            return
+
+        # Passwords must match if a new one is provided
+        if new_password and new_password != confirm_pw:
+            self._send(200, _page_setup(
+                alert="New passwords do not match — no changes saved.",
+                alert_type="error",
+            ))
+            return
+
+        updates = {}
+        if new_username:
+            updates["APP_USERNAME"] = new_username
+        if new_password:
+            updates["APP_PASSWORD"] = new_password
+
+        if updates:
+            _write_env(updates)
+            # Reload config so new credentials take effect immediately
+            from dotenv import load_dotenv as _ldenv
+            _ldenv(override=True)
+            from config import config as _cfg
+            if "APP_USERNAME" in updates:
+                _cfg.app_username = updates["APP_USERNAME"]
+            if "APP_PASSWORD" in updates:
+                _cfg.app_password = updates["APP_PASSWORD"]
+            self._send(200, _page_setup(
+                alert="Login credentials updated successfully.",
+                alert_type="success",
+            ))
+        else:
+            self._send(200, _page_setup(
+                alert="No changes to save.",
+                alert_type="success",
+            ))
 
     def _save_influence(self, body: dict):
         from src.influence import save as save_influence
