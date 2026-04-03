@@ -99,6 +99,10 @@ class Config:
     remotion_enabled: bool = _optional("REMOTION_ENABLED", "true").lower() in ("true", "1", "yes")
     remotion_yt_stitch: bool = _optional("REMOTION_YT_STITCH", "false").lower() in ("true", "1", "yes")
 
+    # Auth
+    app_username: str = _optional("APP_USERNAME", "admin")
+    app_password: str = _optional("APP_PASSWORD", "")
+
     # Environment
     app_env: str = _optional("APP_ENV", "production").lower()
 

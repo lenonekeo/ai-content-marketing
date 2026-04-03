@@ -432,6 +432,7 @@ def _nav(active: str = "") -> str:
         f'<a href="{href}" class="{"active" if active == href else ""}">{name}</a>'
         for href, name in pages
     )
+    links += '<a href="/logout" style="margin-left:auto;color:#94a3b8;font-size:13px">Sign out</a>'
     return f"""<nav>
   <div class="nav-brand">MakOne <span>BI</span></div>
   <div class="nav-links">{links}</div>
@@ -1818,6 +1819,92 @@ _publish_callback = None  # set by start_approval_server
 # Background video generation jobs: job_id -> {"status": "pending"|"done"|"error", "url": "", "error": ""}
 _video_jobs: dict = {}
 
+# ---------------------------------------------------------------------------
+# Auth / Session management
+# ---------------------------------------------------------------------------
+import time as _time
+import hmac as _hmac
+import hashlib as _hashlib
+
+_sessions: dict = {}  # token -> expiry timestamp
+_SESSION_TTL = 86400  # 24 hours
+
+
+def _session_create() -> str:
+    token = secrets.token_urlsafe(32)
+    _sessions[token] = _time.time() + _SESSION_TTL
+    return token
+
+
+def _session_valid(token: str | None) -> bool:
+    if not token:
+        return False
+    exp = _sessions.get(token)
+    if not exp:
+        return False
+    if _time.time() > exp:
+        _sessions.pop(token, None)
+        return False
+    return True
+
+
+def _session_delete(token: str):
+    _sessions.pop(token, None)
+
+
+def _get_session_cookie(handler) -> str | None:
+    raw = handler.headers.get("Cookie", "")
+    for part in raw.split(";"):
+        k, _, v = part.strip().partition("=")
+        if k.strip() == "session":
+            return v.strip()
+    return None
+
+
+def _password_valid(password: str) -> bool:
+    from config import config as _cfg
+    stored = _cfg.app_password
+    if not stored:
+        return False  # No password set → deny all
+    return _hmac.compare_digest(
+        _hashlib.sha256(password.encode()).hexdigest(),
+        _hashlib.sha256(stored.encode()).hexdigest(),
+    )
+
+
+def _page_login(error: str = "") -> str:
+    err_html = f'<div style="background:#fee2e2;color:#dc2626;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:14px">{_esc(error)}</div>' if error else ""
+    return _head("Login") + f"""
+<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#f8fafc 0%,#e2e8f0 100%)">
+  <div style="background:#fff;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.12);padding:48px 40px;width:100%;max-width:400px">
+    <div style="text-align:center;margin-bottom:32px">
+      <div style="font-size:36px;margin-bottom:8px">🤖</div>
+      <div style="font-size:22px;font-weight:800;color:#1e293b">MakOne BI</div>
+      <div style="font-size:14px;color:#64748b;margin-top:4px">AI Content Marketing</div>
+    </div>
+    {err_html}
+    <form method="POST" action="/login">
+      <div style="margin-bottom:16px">
+        <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Username</label>
+        <input name="username" type="text" autocomplete="username" required
+          style="width:100%;box-sizing:border-box;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:15px;outline:none"
+          onfocus="this.style.borderColor='#4f8ef7'" onblur="this.style.borderColor='#e2e8f0'">
+      </div>
+      <div style="margin-bottom:24px">
+        <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:6px">Password</label>
+        <input name="password" type="password" autocomplete="current-password" required
+          style="width:100%;box-sizing:border-box;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:15px;outline:none"
+          onfocus="this.style.borderColor='#4f8ef7'" onblur="this.style.borderColor='#e2e8f0'">
+      </div>
+      <button type="submit"
+        style="width:100%;padding:12px;background:linear-gradient(135deg,#4f8ef7,#a855f7);color:#fff;border:none;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer">
+        Sign In
+      </button>
+    </form>
+  </div>
+</div>
+</body></html>"""
+
 
 def _start_video_job(job_id: str, video_type: str, text: str, composition: str = "PostCard"):
     """Run video generation in a background thread."""
@@ -1954,11 +2041,54 @@ _SETUP_KEYS = {
 
 class _Handler(BaseHTTPRequestHandler):
 
+    # ------------------------------------------------------------------
+    # Auth helpers
+    # ------------------------------------------------------------------
+
+    def _is_authenticated(self) -> bool:
+        return _session_valid(_get_session_cookie(self))
+
+    def _require_auth(self) -> bool:
+        """Return True if authenticated. Otherwise redirect to /login and return False."""
+        if self._is_authenticated():
+            return True
+        self.send_response(302)
+        self.send_header("Location", "/login")
+        self.end_headers()
+        return False
+
+    def _set_session_cookie(self, token: str):
+        self.send_header("Set-Cookie", f"session={token}; HttpOnly; SameSite=Lax; Max-Age={_SESSION_TTL}; Path=/")
+
+    def _clear_session_cookie(self):
+        self.send_header("Set-Cookie", "session=; HttpOnly; SameSite=Lax; Max-Age=0; Path=/")
+
+    # ------------------------------------------------------------------
+    # GET
+    # ------------------------------------------------------------------
+
     def do_GET(self):
         try:
             p = urlparse(self.path)
             qs = parse_qs(p.query)
             token = qs.get("token", [None])[0]
+
+            # Public routes — no auth required
+            if p.path == "/login":
+                self._send(200, _page_login())
+                return
+            if p.path == "/logout":
+                _session_delete(_get_session_cookie(self))
+                self.send_response(302)
+                self._clear_session_cookie()
+                self.send_header("Location", "/login")
+                self.end_headers()
+                return
+            # /review, /reject, /media/ stay public (used in emails)
+            if p.path in ("/review", "/reject") or p.path.startswith("/media/"):
+                pass  # fall through to route handling below
+            elif not self._require_auth():
+                return
 
             if p.path in ("/", ""):
                 self._send(200, _page_dashboard())
@@ -2023,6 +2153,25 @@ class _Handler(BaseHTTPRequestHandler):
             token = qs.get("token", [None])[0]
             n = int(self.headers.get("Content-Length", 0))
             body = parse_qs(self.rfile.read(n).decode("utf-8", errors="replace"))
+
+            # Login handler — public
+            if p.path == "/login":
+                username = body.get("username", [""])[0].strip()
+                password = body.get("password", [""])[0]
+                from config import config as _auth_cfg
+                if username == _auth_cfg.app_username and _password_valid(password):
+                    session_token = _session_create()
+                    self.send_response(302)
+                    self._set_session_cookie(session_token)
+                    self.send_header("Location", "/")
+                    self.end_headers()
+                else:
+                    self._send(200, _page_login("Invalid username or password."))
+                return
+
+            # All other POST routes require auth
+            if not self._require_auth():
+                return
 
             if p.path == "/setup":
                 self._save_setup(body)
