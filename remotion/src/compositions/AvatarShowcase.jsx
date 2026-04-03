@@ -22,16 +22,16 @@ function GlowOrb({ top, left, size, color, opacity = 0.12 }) {
   );
 }
 
-// Scene boundaries (frames)
+// Fixed scene boundaries (S1 and S2 are always 5s each)
 const S1_START = 0;
 const S2_START = 150;
 const S3_START = 300;
-const TOTAL    = 420;
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
-export const AvatarShowcase = () => {
+export const AvatarShowcase = ({ videoDurationSecs = 14 }) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { fps, durationInFrames } = useVideoConfig();
+  const TOTAL = durationInFrames; // driven by calculateMetadata in Root.jsx
 
   // Scene progress (0–1 within each scene)
   const inS1 = frame >= S1_START && frame < S2_START;

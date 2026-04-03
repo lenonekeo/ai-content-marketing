@@ -1866,9 +1866,14 @@ def _start_video_job(job_id: str, video_type: str, text: str, composition: str =
                     remotion_client.download_heygen_to_public(heygen_url)
                     remotion_client.capture_screenshots()
 
-                    # Step 3 — Render AvatarShowcase with Remotion
+                    # Step 3 — Get video duration, then render AvatarShowcase
                     _video_jobs[job_id]["message"] = "Step 3/3: Rendering AvatarShowcase with Remotion (1–2 min)..."
-                    remotion_client.render_composition(comp, fname, props={})
+                    import os as _ospath
+                    heygen_pub = _ospath.join(
+                        _ospath.dirname(__file__), '..', 'remotion', 'public', 'heygen_latest.mp4'
+                    )
+                    vid_secs = remotion_client.get_video_duration(_ospath.abspath(heygen_pub))
+                    remotion_client.render_composition(comp, fname, props={"videoDurationSecs": vid_secs})
 
                 elif comp == "PostCard":
                     _video_jobs[job_id]["message"] = "Extracting post content for Post Card..."

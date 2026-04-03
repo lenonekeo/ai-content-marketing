@@ -149,6 +149,29 @@ def capture_screenshots(base_url: str = "https://app.makone-bi.com") -> bool:
         return False
 
 
+def get_video_duration(video_path: str) -> float:
+    """
+    Use ffprobe to get video duration in seconds.
+    Returns 14.0 as fallback if ffprobe is unavailable.
+    """
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe", "-v", "error",
+                "-show_entries", "format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                video_path,
+            ],
+            capture_output=True, text=True, timeout=15,
+        )
+        duration = float(result.stdout.strip())
+        logger.info(f"Video duration: {duration:.1f}s — {video_path}")
+        return duration
+    except Exception as e:
+        logger.warning(f"ffprobe failed, using default duration: {e}")
+        return 14.0
+
+
 def download_heygen_to_public(heygen_url: str) -> str:
     """
     Download a HeyGen CDN video URL and save it as remotion/public/heygen_latest.mp4.

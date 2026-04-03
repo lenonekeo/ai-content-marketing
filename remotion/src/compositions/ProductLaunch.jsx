@@ -268,17 +268,25 @@ export const ProductLaunch = ({
   ctaText     = DEFAULT_CTA,
   subText     = DEFAULT_SUB_TEXT,
 }) => {
-  // Normalise features — ensure each has a color
-  const colors = [B_BLUE, B_PURPLE, B_CYAN];
-  const normFeatures = features.slice(0, 3).map((f, i) => ({ color: colors[i], ...f }));
+  // Normalise features — cap at 5, ensure each has a color
+  const colors = [B_BLUE, B_PURPLE, B_CYAN, B_BLUE, B_PURPLE];
+  const normFeatures = features.slice(0, 5).map((f, i) => ({ color: colors[i], ...f }));
+  const featureCount = normFeatures.length;
+
+  // Scene timing matches calculateMetadata in Root.jsx
+  // Hook(3s=90f) + Reveal(4s=120f) + Features(3s×n) + Stats(4s=120f) + CTA(5s=150f)
+  const hookEnd     = 90;
+  const revealEnd   = hookEnd + 120;
+  const featuresEnd = revealEnd + featureCount * 90;
+  const statsEnd    = featuresEnd + 120;
 
   return (
     <AbsoluteFill style={{ background: BG }}>
-      <Sequence from={0}   durationInFrames={90}>  <SceneHook     hookLine1={hookLine1} hookLine2={hookLine2} /></Sequence>
-      <Sequence from={90}  durationInFrames={120}> <SceneReveal   productName={productName} tagline={tagline} /></Sequence>
-      <Sequence from={210} durationInFrames={270}> <SceneFeatures features={normFeatures} /></Sequence>
-      <Sequence from={480} durationInFrames={120}> <SceneStats    stats={stats.slice(0, 3)} /></Sequence>
-      <Sequence from={600} durationInFrames={150}> <SceneCTA      ctaText={ctaText} subText={subText} /></Sequence>
+      <Sequence from={0}          durationInFrames={hookEnd}>              <SceneHook     hookLine1={hookLine1} hookLine2={hookLine2} /></Sequence>
+      <Sequence from={hookEnd}    durationInFrames={120}>                  <SceneReveal   productName={productName} tagline={tagline} /></Sequence>
+      <Sequence from={revealEnd}  durationInFrames={featureCount * 90}>   <SceneFeatures features={normFeatures} /></Sequence>
+      <Sequence from={featuresEnd}durationInFrames={120}>                  <SceneStats    stats={stats.slice(0, 3)} /></Sequence>
+      <Sequence from={statsEnd}   durationInFrames={150}>                  <SceneCTA      ctaText={ctaText} subText={subText} /></Sequence>
     </AbsoluteFill>
   );
 };
