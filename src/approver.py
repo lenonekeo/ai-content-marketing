@@ -1849,6 +1849,8 @@ def _start_video_job(job_id: str, video_type: str, text: str, composition: str =
                 fname = f"remotion_{comp}_{ts}.mp4"
                 logger.info(f"Remotion render: composition={comp}, text preview={text[:80]}")
 
+                from src.content_generator import extract_remotion_props
+
                 if comp == "AvatarShowcase":
                     # Step 1 — Generate HeyGen avatar video with the chat script
                     _video_jobs[job_id]["message"] = "Step 1/3: Generating HeyGen avatar video (5–20 min)..."
@@ -1867,12 +1869,39 @@ def _start_video_job(job_id: str, video_type: str, text: str, composition: str =
                     # Step 3 — Render AvatarShowcase with Remotion
                     _video_jobs[job_id]["message"] = "Step 3/3: Rendering AvatarShowcase with Remotion (1–2 min)..."
                     remotion_client.render_composition(comp, fname, props={})
+
                 elif comp == "PostCard":
-                    remotion_client.render_post_card(text, fname)
+                    _video_jobs[job_id]["message"] = "Extracting post content for Post Card..."
+                    props = extract_remotion_props(text, "PostCard")
+                    props.setdefault("businessName", _cfg.business_name)
+                    props.setdefault("website", _cfg.business_website)
+                    props.setdefault("text", text[:200])
+                    _video_jobs[job_id]["message"] = "Rendering Post Card..."
+                    remotion_client.render_composition(comp, fname, props=props)
+
                 elif comp == "Intro":
-                    remotion_client.render_intro(fname)
+                    _video_jobs[job_id]["message"] = "Extracting tagline for Intro..."
+                    props = extract_remotion_props(text, "Intro")
+                    props.setdefault("businessName", _cfg.business_name)
+                    props.setdefault("tagline", "AI Automation Experts")
+                    _video_jobs[job_id]["message"] = "Rendering YouTube Intro..."
+                    remotion_client.render_composition(comp, fname, props=props)
+
                 elif comp == "Outro":
-                    remotion_client.render_outro(fname)
+                    _video_jobs[job_id]["message"] = "Extracting CTA for Outro..."
+                    props = extract_remotion_props(text, "Outro")
+                    props.setdefault("businessName", _cfg.business_name)
+                    props.setdefault("website", _cfg.business_website)
+                    props.setdefault("ctaText", "Book a free discovery call")
+                    _video_jobs[job_id]["message"] = "Rendering YouTube Outro..."
+                    remotion_client.render_composition(comp, fname, props=props)
+
+                elif comp == "ProductLaunch":
+                    _video_jobs[job_id]["message"] = "AI is crafting your product launch script..."
+                    props = extract_remotion_props(text, "ProductLaunch")
+                    _video_jobs[job_id]["message"] = "Rendering Product Launch video (25s)..."
+                    remotion_client.render_composition(comp, fname, props=props, timeout=900)
+
                 else:
                     remotion_client.render_composition(comp, fname, props={})
                 url = _cfg.get_public_url(f"/media/{fname}")

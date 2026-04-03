@@ -77,6 +77,74 @@ def post_to_veo3_prompt(post_text: str) -> str:
     return response.choices[0].message.content.strip()
 
 
+def extract_remotion_props(post_text: str, composition: str) -> dict:
+    """
+    Use AI to extract structured props from chat content for a Remotion composition.
+    Returns a dict ready to pass as --props to the Remotion renderer.
+    """
+    import json
+
+    prompts = {
+        "PostCard": (
+            "Extract a social media post card from this content.\n"
+            "Return JSON with exactly these keys:\n"
+            '- "text": the main post text (max 200 chars, punchy and engaging)\n'
+            '- "hashtags": 3-5 relevant hashtags as a string like "#AI #Marketing"\n'
+            "Rules: JSON only, no explanation.\n\n"
+            f"Content:\n{post_text}"
+        ),
+        "Intro": (
+            "Extract a branded video intro from this content.\n"
+            "Return JSON with exactly these keys:\n"
+            '- "tagline": one powerful tagline (max 6 words, e.g. "AI That Works For You")\n'
+            "Rules: JSON only, no explanation.\n\n"
+            f"Content:\n{post_text}"
+        ),
+        "Outro": (
+            "Extract a video outro call-to-action from this content.\n"
+            "Return JSON with exactly these keys:\n"
+            '- "ctaText": one clear call to action (max 8 words, e.g. "Book Your Free Strategy Call")\n'
+            "Rules: JSON only, no explanation.\n\n"
+            f"Content:\n{post_text}"
+        ),
+        "ProductLaunch": (
+            "Extract a product launch video script from this content.\n"
+            "Return JSON with exactly these keys:\n"
+            '- "hookLine1": a provocative question or problem statement (max 10 words)\n'
+            '- "hookLine2": the empowering answer (max 8 words, e.g. "There\'s a smarter way.")\n'
+            '- "productName": the product or brand name (max 3 words)\n'
+            '- "tagline": one-line product description (max 8 words)\n'
+            '- "features": array of exactly 3 objects, each with "icon" (single emoji), "title" (max 5 words), "desc" (max 20 words)\n'
+            '- "stats": array of exactly 3 objects, each with "value" (short like "10x" or "24/7") and "label" (max 3 words)\n'
+            '- "ctaText": call to action button text (max 6 words)\n'
+            '- "subText": supporting line above CTA (max 8 words)\n'
+            "Rules: JSON only, no explanation, all fields required.\n\n"
+            f"Content:\n{post_text}"
+        ),
+    }
+
+    prompt = prompts.get(composition)
+    if not prompt:
+        return {}
+
+    logger.info(f"Extracting Remotion props for {composition} from chat content...")
+    try:
+        response = _client.chat.completions.create(
+            model=config.openai_model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.5,
+            max_tokens=500,
+            response_format={"type": "json_object"},
+        )
+        raw = response.choices[0].message.content.strip()
+        props = json.loads(raw)
+        logger.info(f"Extracted props for {composition}: {list(props.keys())}")
+        return props
+    except Exception as e:
+        logger.warning(f"Props extraction failed for {composition}: {e} — using defaults")
+        return {}
+
+
 def generate_script(post_text: str, script_prompt_template: str) -> str:
     prompt = script_prompt_template.format(post=post_text)
     logger.info("Generating video script with OpenAI...")
