@@ -493,7 +493,7 @@ def _head(title: str) -> str:
 def _nav(active: str = "") -> str:
     pages = [("/", "Dashboard"), ("/create", "Create"), ("/render", "🎬 Render"), ("/setup", "Setup"), ("/influence", "Content Influence"), ("/calendar", "Calendar")]
     links = "".join(
-        f'<a href="{href}" class="{"active" if active == href else ""}">{name}</a>'
+        '<a href="{}" class="{}">{}</a>'.format(href, "active" if active == href else "", name)
         for href, name in pages
     )
     return f"""<nav>
