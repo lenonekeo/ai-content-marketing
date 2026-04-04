@@ -487,7 +487,7 @@ def _head(title: str) -> str:
   document.documentElement.setAttribute('data-theme', t);
 }})();
 </script>
-</head><body>
+</head><body>"""
 
 
 def _nav(active: str = "") -> str:
