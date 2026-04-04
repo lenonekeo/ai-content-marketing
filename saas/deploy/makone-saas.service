@@ -1,0 +1,20 @@
+[Unit]
+Description=MakOne SaaS Control Plane
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+User=root
+WorkingDirectory=/opt/makone/saas
+EnvironmentFile=/opt/makone/saas/.env
+ExecStart=/opt/makone/saas/venv/bin/gunicorn app:app \
+    --bind 0.0.0.0:3000 \
+    --workers 2 \
+    --timeout 120 \
+    --access-logfile /opt/makone/saas/access.log \
+    --error-logfile /opt/makone/saas/error.log
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
