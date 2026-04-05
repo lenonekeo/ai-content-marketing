@@ -2399,7 +2399,7 @@ def _start_video_job(job_id: str, video_type: str, text: str, composition: str =
                     # Step 2 — Download avatar video + capture fresh screenshots
                     _video_jobs[job_id]["message"] = "Step 2/3: Downloading avatar video & capturing screenshots..."
                     remotion_client.download_heygen_to_public(heygen_url)
-                    remotion_client.capture_screenshots()
+                    remotion_client.capture_screenshots(_cfg.get_public_url())
 
                     # Step 3 — Get video duration, then render AvatarShowcase
                     _video_jobs[job_id]["message"] = "Step 3/3: Rendering AvatarShowcase with Remotion (1–2 min)..."
