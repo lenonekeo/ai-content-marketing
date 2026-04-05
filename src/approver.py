@@ -1917,7 +1917,7 @@ async function generateVideo(type, composition) {{
 
   // Extract the last URL mentioned anywhere in the chat conversation
   function _lastChatUrl() {{
-    const urlRe = /https?:\/\/[^\s"'<>)]+/g;
+    const urlRe = new RegExp("https?://[^\\s\"'<>)]+", "g");
     for (let i = messages.length - 1; i >= 0; i--) {{
       const found = (messages[i].content || "").match(urlRe);
       if (found && found.length > 0) return found[found.length - 1];
@@ -2070,15 +2070,43 @@ import time as _time
 import hmac as _hmac
 import hashlib as _hashlib
 
-_sessions: dict = {}       # session_token -> {expiry, username}
 _reset_tokens: dict = {}   # reset_token -> {username, expiry}
-_SESSION_TTL = 86400       # 24 hours
+_SESSION_TTL = 86400 * 30  # 30 days
 _RESET_TTL   = 3600        # 1 hour
+
+import json as _json_mod
+import os as _os_mod
+
+_SESSION_FILE = _os_mod.path.join(_os_mod.path.dirname(__file__), '..', 'data', 'sessions.json')
+
+
+def _sessions_load() -> dict:
+    try:
+        with open(_SESSION_FILE) as _f:
+            data = _json_mod.load(_f)
+        # Drop expired entries on load
+        now = _time.time()
+        return {k: v for k, v in data.items() if v.get("expiry", 0) > now}
+    except Exception:
+        return {}
+
+
+def _sessions_save(sessions: dict):
+    try:
+        _os_mod.makedirs(_os_mod.path.dirname(_SESSION_FILE), exist_ok=True)
+        with open(_SESSION_FILE, "w") as _f:
+            _json_mod.dump(sessions, _f)
+    except Exception:
+        pass
+
+
+_sessions: dict = _sessions_load()
 
 
 def _session_create(username: str = "") -> str:
     token = secrets.token_urlsafe(32)
     _sessions[token] = {"expiry": _time.time() + _SESSION_TTL, "username": username}
+    _sessions_save(_sessions)
     return token
 
 
@@ -2101,12 +2129,14 @@ def _session_valid(token: str | None) -> bool:
     exp = entry.get("expiry", 0) if isinstance(entry, dict) else entry
     if _time.time() > exp:
         _sessions.pop(token, None)
+        _sessions_save(_sessions)
         return False
     return True
 
 
 def _session_delete(token: str):
     _sessions.pop(token, None)
+    _sessions_save(_sessions)
 
 
 def _get_session_cookie(handler) -> str | None:
