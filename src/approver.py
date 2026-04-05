@@ -2151,11 +2151,10 @@ def _page_login(error: str = "", tab: str = "signin", success: str = "") -> str:
     ok_html  = f'<div style="background:rgba(46,204,113,0.12);color:#4ade80;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:14px;border:1px solid rgba(46,204,113,0.3)">{_esc(success)}</div>' if success else ""
     from config import config as _cfg
     smtp_note = "" if _cfg.smtp_enabled else '<p style="font-size:11px;color:#475569;margin-top:8px">⚠ No email configured — your admin will share the reset link with you.</p>'
-    return """<!DOCTYPE html><html lang="en"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MakOne BI — AI Content Marketing</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
+    si = "active" if tab == "signin" else ""
+    su = "active" if tab == "signup" else ""
+    fo = "active" if tab == "forgot" else ""
+    _login_css = """*{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Segoe UI',Arial,sans-serif;background:#07071a;color:#fff;min-height:100vh;overflow-x:hidden}
 .glow{position:absolute;border-radius:50%;pointer-events:none;filter:blur(80px)}
 .hero{min-height:100vh;display:flex;flex-direction:row;align-items:stretch}
@@ -2175,7 +2174,6 @@ h1{font-size:56px;font-weight:900;line-height:1.1;margin-bottom:24px;letter-spac
 .stats{display:flex;gap:36px}
 .stat-val{font-size:30px;font-weight:900;background:linear-gradient(90deg,#4f8ef7,#a855f7);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .stat-label{font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-top:2px}
-/* Right panel */
 .auth-card{width:100%;max-width:380px}
 .tab-bar{display:flex;gap:4px;background:rgba(255,255,255,0.05);border-radius:10px;padding:4px;margin-bottom:24px}
 .tab-btn{flex:1;padding:8px 4px;border:none;background:transparent;color:#64748b;font-size:13px;font-weight:600;cursor:pointer;border-radius:7px;transition:all .2s}
@@ -2197,8 +2195,11 @@ h1{font-size:56px;font-weight:900;line-height:1.1;margin-bottom:24px;letter-spac
   h1{font-size:36px}
   .right{width:100%;border-left:none;border-top:1px solid rgba(255,255,255,0.06);padding:36px 28px}
   .stats{gap:20px}
-}
-</style>
+}"""
+    return f"""<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MakOne BI — AI Content Marketing</title>
+<style>{_login_css}</style>
 </head><body>
 <div class="hero">
 
@@ -2239,15 +2240,15 @@ h1{font-size:56px;font-weight:900;line-height:1.1;margin-bottom:24px;letter-spac
       <div style="font-size:30px;margin-bottom:14px">🤖</div>
 
       <div class="tab-bar">
-        <button class="tab-btn """ + ("active" if tab=="signin" else "") + f"""" onclick="showTab('signin')">Sign In</button>
-        <button class="tab-btn {"active" if tab=="signup" else ""}" onclick="showTab('signup')">Sign Up</button>
-        <button class="tab-btn {"active" if tab=="forgot" else ""}" onclick="showTab('forgot')">Reset Password</button>
+        <button class="tab-btn {si}" onclick="showTab('signin')">Sign In</button>
+        <button class="tab-btn {su}" onclick="showTab('signup')">Sign Up</button>
+        <button class="tab-btn {fo}" onclick="showTab('forgot')">Reset Password</button>
       </div>
 
       {err_html}{ok_html}
 
       <!-- SIGN IN -->
-      <div id="tab-signin" class="tab-pane {"active" if tab=="signin" else ""}">
+      <div id="tab-signin" class="tab-pane {si}">
         <div class="auth-title">Welcome back</div>
         <div class="auth-sub">Sign in to your MakOne BI dashboard</div>
         <form method="POST" action="/login">
@@ -2260,7 +2261,7 @@ h1{font-size:56px;font-weight:900;line-height:1.1;margin-bottom:24px;letter-spac
       </div>
 
       <!-- SIGN UP -->
-      <div id="tab-signup" class="tab-pane {"active" if tab=="signup" else ""}">
+      <div id="tab-signup" class="tab-pane {su}">
         <div class="auth-title">Create an account</div>
         <div class="auth-sub">Request access to MakOne BI</div>
         <form method="POST" action="/signup">
@@ -2277,7 +2278,7 @@ h1{font-size:56px;font-weight:900;line-height:1.1;margin-bottom:24px;letter-spac
       </div>
 
       <!-- FORGOT PASSWORD -->
-      <div id="tab-forgot" class="tab-pane {"active" if tab=="forgot" else ""}">
+      <div id="tab-forgot" class="tab-pane {fo}">
         <div class="auth-title">Reset your password</div>
         <div class="auth-sub">Enter your email to receive a reset link</div>
         <form method="POST" action="/forgot-password">
