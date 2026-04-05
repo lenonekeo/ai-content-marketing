@@ -126,7 +126,7 @@ export const AvatarShowcase = ({ videoDurationSecs = 14 }) => {
       }}>
         <OffthreadVideo
           src={staticFile("heygen_latest.mp4")}
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scale(1.18)", objectPosition: "center center" }}
         />
       </div>
 
