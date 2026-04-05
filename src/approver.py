@@ -1915,12 +1915,25 @@ async function generateVideo(type, composition) {{
   if (heygenBtn) heygenBtn.disabled = true;
   if (remotionBtn) remotionBtn.disabled = true;
 
+  // Extract the last URL mentioned anywhere in the chat conversation
+  function _lastChatUrl() {{
+    const urlRe = /https?:\/\/[^\s"'<>)]+/g;
+    for (let i = messages.length - 1; i >= 0; i--) {{
+      const found = (messages[i].content || "").match(urlRe);
+      if (found && found.length > 0) return found[found.length - 1];
+    }}
+    return "";
+  }}
+
   try {{
     let bodyStr;
     if (type === "veo3") {{
       bodyStr = "prompt=" + encodeURIComponent(script);
     }} else if (type === "remotion") {{
-      bodyStr = "script=" + encodeURIComponent(script) + "&composition=" + encodeURIComponent(composition || "PostCard");
+      const screenshotUrl = composition === "AvatarShowcase" ? _lastChatUrl() : "";
+      bodyStr = "script=" + encodeURIComponent(script) +
+                "&composition=" + encodeURIComponent(composition || "PostCard") +
+                (screenshotUrl ? "&screenshot_url=" + encodeURIComponent(screenshotUrl) : "");
     }} else {{
       bodyStr = "script=" + encodeURIComponent(script);
     }}
@@ -2354,7 +2367,7 @@ button{width:100%;padding:13px;background:linear-gradient(135deg,#4f8ef7,#a855f7
 </body></html>"""
 
 
-def _start_video_job(job_id: str, video_type: str, text: str, composition: str = "PostCard"):
+def _start_video_job(job_id: str, video_type: str, text: str, composition: str = "PostCard", screenshot_url: str = ""):
     """Run video generation in a background thread."""
     import threading
     import datetime as _dtmod
@@ -2399,7 +2412,9 @@ def _start_video_job(job_id: str, video_type: str, text: str, composition: str =
                     # Step 2 — Download avatar video + capture fresh screenshots
                     _video_jobs[job_id]["message"] = "Step 2/3: Downloading avatar video & capturing screenshots..."
                     remotion_client.download_heygen_to_public(heygen_url)
-                    remotion_client.capture_screenshots(_cfg.get_public_url())
+                    snap_url = screenshot_url or _cfg.get_public_url() or "http://localhost:8080"
+                    logger.info(f"AvatarShowcase: capturing screenshots from {snap_url}")
+                    remotion_client.capture_screenshots(snap_url)
 
                     # Step 3 — Get video duration, then render AvatarShowcase
                     _video_jobs[job_id]["message"] = "Step 3/3: Rendering AvatarShowcase with Remotion (1–2 min)..."
@@ -3359,8 +3374,9 @@ class _Handler(BaseHTTPRequestHandler):
         if not text:
             text = "AI automation and business intelligence services"
         composition = body.get("composition", ["PostCard"])[0].strip() if video_type == "remotion" else "PostCard"
+        screenshot_url = body.get("screenshot_url", [""])[0].strip()
         job_id = _sec.token_urlsafe(12)
-        _start_video_job(job_id, video_type, text, composition)
+        _start_video_job(job_id, video_type, text, composition, screenshot_url=screenshot_url)
         self._send_json({"job_id": job_id})
 
     # ------------------------------------------------------------------
