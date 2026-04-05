@@ -1917,7 +1917,7 @@ async function generateVideo(type, composition) {{
 
   // Extract the last URL mentioned anywhere in the chat conversation
   function _lastChatUrl() {{
-    const urlRe = new RegExp("https?://[^\\s\"'<>)]+", "g");
+    const urlRe = new RegExp("https?://\\\\S+", "g");
     for (let i = messages.length - 1; i >= 0; i--) {{
       const found = (messages[i].content || "").match(urlRe);
       if (found && found.length > 0) return found[found.length - 1];
