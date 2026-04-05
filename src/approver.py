@@ -1952,9 +1952,11 @@ async function generateVideo(type, composition) {{
             document.getElementById("prev-remotion-label").textContent = "🎬 REMOTION — " + compLabel.toUpperCase();
             document.getElementById("prev-remotion").src = sd.url;
             document.getElementById("prev-remotion-wrap").style.display = "block";
+            showDraftSection(script);
           }} else {{
             document.getElementById("prev-heygen").src = sd.url;
             document.getElementById("prev-heygen-wrap").style.display = "block";
+            showDraftSection(script);
           }}
           document.getElementById("draft-section").style.display = "block";
           _endJob();
