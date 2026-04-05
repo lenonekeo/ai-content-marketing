@@ -1749,6 +1749,18 @@ function useThis(idx) {{
   document.getElementById("draft-section").scrollIntoView({{behavior:"smooth",block:"start"}});
 }}
 
+function showDraftSection(fallbackText) {{
+  // Use the last AI-generated draft text (formatted social post); fall back to the passed text
+  const text = _draftTexts.length > 0 ? _draftTexts[_draftTexts.length - 1] : fallbackText;
+  const platforms = getSelectedPlatforms();
+  document.getElementById("li-field").style.display = platforms.includes("linkedin") ? "" : "none";
+  document.getElementById("fb-field").style.display = platforms.includes("facebook") ? "" : "none";
+  document.getElementById("ig-field").style.display = platforms.includes("instagram") ? "" : "none";
+  if (platforms.includes("linkedin")) document.getElementById("linkedin_text").value = text;
+  if (platforms.includes("facebook")) document.getElementById("facebook_text").value = text;
+  if (platforms.includes("instagram")) document.getElementById("instagram_caption").value = text;
+}}
+
 async function saveAsDraft() {{
   const li = document.getElementById("linkedin_text").value.trim();
   const fb = document.getElementById("facebook_text").value.trim();
