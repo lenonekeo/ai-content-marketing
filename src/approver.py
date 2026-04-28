@@ -3658,4 +3658,38 @@ def start_approval_server(publish_callback, port: int = 8080):
     sp = threading.Thread(target=_scheduled_publisher, daemon=True)
     sp.start()
     logger.info("Scheduled post publisher started (checks every 60s)")
+
+    def _media_cleanup():
+        """Delete media files older than 24h from downloads/ and remotion/out/."""
+        import time as _time
+        import os as _os
+        import glob as _glob
+        while True:
+            _time.sleep(3600)  # check every hour
+            try:
+                from config import config as _cfg
+                cutoff = _time.time() - 86400  # 24 hours
+                base = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+                dirs = [
+                    _os.path.join(base, _cfg.downloads_dir),
+                    _os.path.join(base, "remotion", "out"),
+                ]
+                deleted = 0
+                for d in dirs:
+                    for f in _glob.glob(_os.path.join(d, "*.mp4")) + _glob.glob(_os.path.join(d, "*.png")):
+                        try:
+                            if _os.path.getmtime(f) < cutoff:
+                                _os.remove(f)
+                                deleted += 1
+                        except Exception:
+                            pass
+                if deleted:
+                    logger.info(f"Media cleanup: deleted {deleted} files older than 24h")
+            except Exception as e:
+                logger.warning(f"Media cleanup error: {e}")
+
+    mc = threading.Thread(target=_media_cleanup, daemon=True)
+    mc.start()
+    logger.info("Media cleanup started (runs hourly, deletes files older than 24h)")
+
     return server
