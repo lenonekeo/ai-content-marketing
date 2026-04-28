@@ -1008,15 +1008,9 @@ def _page_setup(alert: str = "", alert_type: str = "success", current_username: 
 
     <div class="card">
       <div class="card-title">Business Info</div>
-      <div class="grid-2">
-        <div class="field">
-          <label>Business Name</label>
-          <input type="text" name="BUSINESS_NAME" value="{val("BUSINESS_NAME", "MakOne Business Intelligence")}">
-        </div>
-        <div class="field">
-          <label>Contact Email</label>
-          <input type="text" name="CONTACT_EMAIL" value="{val("CONTACT_EMAIL")}">
-        </div>
+      <div class="field">
+        <label>Business Name</label>
+        <input type="text" name="BUSINESS_NAME" value="{val("BUSINESS_NAME", "MakOne Business Intelligence")}">
       </div>
       <div class="field">
         <label>Website</label>
@@ -1026,7 +1020,11 @@ def _page_setup(alert: str = "", alert_type: str = "success", current_username: 
 
     <div class="card">
       <div class="card-title">Email Notifications</div>
-      <div class="grid-2">
+      <div class="field">
+        <label>Notification Email <span class="hint">where approval &amp; error alerts are sent</span></label>
+        <input type="email" name="CONTACT_EMAIL" value="{val("CONTACT_EMAIL")}" placeholder="you@example.com">
+      </div>
+      <div class="grid-2" style="margin-top:16px">
         <div class="field">
           <label>SMTP Host <span class="hint">your mail server</span></label>
           <input type="text" name="SMTP_HOST" value="{val("SMTP_HOST", "smtp.gmail.com")}"
@@ -1039,13 +1037,17 @@ def _page_setup(alert: str = "", alert_type: str = "success", current_username: 
       </div>
       <div class="grid-2">
         <div class="field">
-          <label>Email Address</label>
+          <label>SMTP Email Address <span class="hint">the account that sends emails</span></label>
           <input type="text" name="SMTP_USER" value="{val("SMTP_USER")}">
         </div>
         <div class="field">
           <label>Password / App Password <span class="hint">leave blank to keep current</span></label>
           <input type="password" name="SMTP_PASSWORD" placeholder="{masked("SMTP_PASSWORD") or "your email password"}">
         </div>
+      </div>
+      <div style="margin-top:12px">
+        <button type="button" class="btn btn-ghost" style="font-size:13px" onclick="sendTestEmail()">Send Test Email</button>
+        <span id="test-email-result" style="font-size:13px;margin-left:12px"></span>
       </div>
     </div>
 
@@ -1230,6 +1232,26 @@ async function listHeygenAvatars() {{
     resultEl.style.display = "block";
   }} catch(e) {{
     statusEl.textContent = "Request failed: " + e.message;
+  }}
+}}
+
+async function sendTestEmail() {{
+  const el = document.getElementById("test-email-result");
+  el.textContent = "Sending...";
+  el.style.color = "#888";
+  try {{
+    const r = await fetch("/setup/test-email", {{method:"POST"}});
+    const d = await r.json();
+    if (d.ok) {{
+      el.textContent = "✓ Test email sent — check your inbox";
+      el.style.color = "#22c55e";
+    }} else {{
+      el.textContent = "✗ " + d.error;
+      el.style.color = "#ef4444";
+    }}
+  }} catch(e) {{
+    el.textContent = "✗ " + e.message;
+    el.style.color = "#ef4444";
   }}
 }}
 </script>
@@ -2762,6 +2784,8 @@ class _Handler(BaseHTTPRequestHandler):
             if p.path == "/setup":
                 _cu = _session_get_username(_get_session_cookie(self))
                 self._save_setup(body, current_username=_cu)
+            elif p.path == "/setup/test-email":
+                self._test_email()
             elif p.path == "/setup/users/approve":
                 self._admin_approve_user(body)
             elif p.path == "/setup/users/delete":
@@ -2862,6 +2886,39 @@ class _Handler(BaseHTTPRequestHandler):
             alert_msg = "Settings saved successfully. Restart the service for changes to take effect."
 
         self._send(200, _page_setup(alert=alert_msg, alert_type="success", current_username=current_username))
+
+    def _test_email(self):
+        from config import config as _cfg
+        from dotenv import load_dotenv as _ldenv
+        _ldenv(override=True)
+        # Re-read config after reload
+        from importlib import reload as _reload
+        import config as _config_mod
+        _reload(_config_mod)
+        cfg = _config_mod.config
+        if not cfg.smtp_enabled:
+            self._send_json({"ok": False, "error": "SMTP not configured — set SMTP_USER and SMTP_PASSWORD in Setup first."})
+            return
+        if not cfg.contact_email:
+            self._send_json({"ok": False, "error": "Notification Email is empty — fill in the CONTACT_EMAIL field and save first."})
+            return
+        import smtplib
+        from email.mime.text import MIMEText
+        msg = MIMEText("This is a test email from your MakOne BI app. Email notifications are working correctly!", "plain")
+        msg["Subject"] = "MakOne BI — Test Email"
+        msg["From"] = cfg.smtp_user
+        msg["To"] = cfg.contact_email
+        try:
+            with smtplib.SMTP(cfg.smtp_host, cfg.smtp_port) as s:
+                s.ehlo()
+                s.starttls()
+                s.login(cfg.smtp_user, cfg.smtp_password)
+                s.sendmail(cfg.smtp_user, cfg.contact_email, msg.as_string())
+            logger.info(f"Test email sent to {cfg.contact_email}")
+            self._send_json({"ok": True})
+        except Exception as e:
+            logger.error(f"Test email failed: {e}")
+            self._send_json({"ok": False, "error": str(e)})
 
     def _admin_approve_user(self, body: dict):
         from src import user_store as _us
