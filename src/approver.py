@@ -24,7 +24,7 @@ import os
 import secrets
 import threading
 from datetime import datetime
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 logger = logging.getLogger(__name__)
@@ -2556,6 +2556,7 @@ _SETUP_KEYS = {
 
 
 class _Handler(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.0"  # disables keep-alive, closes each connection immediately
 
     # ------------------------------------------------------------------
     # Auth helpers
@@ -3627,7 +3628,12 @@ def start_approval_server(publish_callback, port: int = 8080):
     """Start the HTTP admin + approval server in a background daemon thread."""
     global _publish_callback
     _publish_callback = publish_callback
-    server = HTTPServer(("0.0.0.0", port), _Handler)
+    import resource as _resource
+    try:
+        _resource.setrlimit(_resource.RLIMIT_NOFILE, (65536, 65536))
+    except Exception:
+        pass
+    server = ThreadingHTTPServer(("0.0.0.0", port), _Handler)
     t = threading.Thread(target=server.serve_forever, daemon=True)
     t.start()
     logger.info(f"Admin server started on port {port}")

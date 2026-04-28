@@ -13,6 +13,7 @@ RestartSec=60
 StandardOutput=journal
 StandardError=journal
 Environment=PYTHONUNBUFFERED=1
+LimitNOFILE=65536
 
 [Install]
 WantedBy=multi-user.target
