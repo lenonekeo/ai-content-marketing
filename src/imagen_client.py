@@ -33,9 +33,9 @@ def generate_image(prompt: str, filename: str | None = None) -> str:
         "No text or watermarks in the image."
     )
 
-    logger.info("Generating image with Gemini 2.0 Flash image generation...")
+    logger.info("Generating image with Imagen 3...")
     response = client.models.generate_content(
-        model="gemini-2.0-flash-exp-image-generation",
+        model="imagen-3.0-generate-002",
         contents=full_prompt,
         config=types.GenerateContentConfig(
             response_modalities=["IMAGE", "TEXT"],
