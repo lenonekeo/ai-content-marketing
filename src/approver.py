@@ -3288,7 +3288,7 @@ class _Handler(BaseHTTPRequestHandler):
             "client_id": client_id,
             "redirect_uri": redirect_uri,
             "state": _sec.token_urlsafe(16),
-            "scope": "w_member_social openid profile email",
+            "scope": "w_member_social r_basicprofile",
         })
         self.send_response(302)
         self.send_header("Location", auth_url)
@@ -3316,13 +3316,13 @@ class _Handler(BaseHTTPRequestHandler):
             }, headers={"Content-Type": "application/x-www-form-urlencoded"}, timeout=15)
             r.raise_for_status()
             access_token = r.json()["access_token"]
-            me = _req.get("https://api.linkedin.com/v2/userinfo",
+            me = _req.get("https://api.linkedin.com/v2/me",
                 headers={"Authorization": f"Bearer {access_token}"}, timeout=15)
             person_urn = ""
             if me.ok:
-                sub = me.json().get("sub", "")
-                if sub:
-                    person_urn = f"urn:li:person:{sub}"
+                uid = me.json().get("id", "")
+                if uid:
+                    person_urn = f"urn:li:person:{uid}"
             env = _read_env()
             env["LINKEDIN_ACCESS_TOKEN"] = access_token
             if person_urn:
